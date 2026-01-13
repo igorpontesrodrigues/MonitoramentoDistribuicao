@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoramento Face Beautiful Profissional</title>
+    
+    <!-- Bibliotecas Externas -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Configuração do Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fb: {
+                            pink: '#e83e8c',
+                            dark: '#1a1a1a',
+                            light: '#f8f9fa'
+                        }
+                    },
+                    fontSize: {
+                        'xxs': '0.65rem'
+                    },
+                    zIndex: {
+                        '60': '60',
+                        '70': '70',
+                        '80': '80'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #e83e8c;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .active-tab {
+            background-color: #e83e8c;
+            color: white;
+        }
+        
+        .table-compact td, .table-compact th {
+            padding: 0.25rem 0.5rem;
+            white-space: nowrap;
+            font-size: 0.75rem;
+            height: 32px;
+        }
+        
+        .table-compact th {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background-color: #f9fafb;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 10px;
+            width: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 5px;
+            border: 2px solid #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        .modal { transition: opacity 0.25s ease; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800">
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-[70] flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center">
+            <div class="loader mb-4"></div>
+            <p id="loadingText" class="text-gray-700 font-semibold">Carregando...</p>
+        </div>
+    </div>
+
+    <!-- Process Modal -->
+    <div id="processModal" class="fixed inset-0 z-[80] hidden flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm" role="dialog" aria-modal="true">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md transform transition-all scale-100">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h3 class="text-lg font-bold text-gray-800" id="processTitle">Confirmação de Importação</h3>
+                <button onclick="closeProcessModal()" id="btnCloseProcess" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="processConfirmContent">
+                <div class="flex items-start mb-4 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 text-xl mr-3 mt-1"></i>
+                    <p class="text-sm text-yellow-800"><strong>Atenção:</strong> Esta ação irá <span class="font-bold text-red-600">APAGAR TODOS</span> os dados antigos e substituí-los pelo novo arquivo.</p>
+                </div>
+                <div id="uploadStats" class="mb-4 text-center hidden">
+                    <p class="text-sm text-gray-600">Linhas encontradas no arquivo:</p>
+                    <p class="text-2xl font-bold text-fb-pink" id="linesFoundCount">0</p>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button onclick="closeProcessModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">Cancelar</button>
+                    <button onclick="startUploadProcess()" class="px-4 py-2 bg-fb-pink text-white rounded-lg hover:bg-pink-700 text-sm font-medium shadow-md flex items-center"><i class="fas fa-cloud-upload-alt mr-2"></i> Sim, Substituir</button>
+                </div>
+            </div>
+            <div id="processProgressContent" class="hidden text-center py-2">
+                <div class="loader mx-auto mb-4 h-12 w-12 border-4"></div>
+                <h4 class="text-gray-800 font-bold mb-1" id="progressStepTitle">Iniciando...</h4>
+                <p class="text-sm text-gray-500 mb-4" id="progressStepDetail">Preparando ambiente...</p>
+                <div class="w-full bg-gray-200 rounded-full h-3 mb-2 overflow-hidden"><div id="progressBar" class="bg-fb-pink h-3 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div></div>
+                <p class="text-xs text-right text-gray-400" id="progressPercent">0%</p>
+            </div>
+            <div id="processSuccessContent" class="hidden text-center py-4">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500"><i class="fas fa-check text-3xl"></i></div>
+                <h4 class="text-xl font-bold text-gray-800 mb-2">Sucesso!</h4>
+                <p class="text-sm text-gray-600 mb-4" id="successMessage">Dados atualizados.</p>
+                <button onclick="finishProcess()" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow">Fechar e Atualizar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="fixed inset-0 z-[60] hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeEditModal()"></div>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Editar Registro</h3>
+                    <div class="mt-4 grid grid-cols-1 gap-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2" id="modalFormFields"></div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button onclick="saveEditedRow()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-fb-pink text-base font-medium text-white hover:bg-pink-700 sm:ml-3 sm:w-auto sm:text-sm">Salvar</button>
+                    <button onclick="closeEditModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-fb-dark text-white flex-shrink-0 hidden md:flex flex-col z-50">
+            <div class="p-6 border-b border-gray-700">
+                <h1 class="text-2xl font-bold text-fb-pink">Face Beautiful</h1>
+                <p class="text-xs text-gray-400 mt-1">Monitoramento Logístico</p>
+            </div>
+            
+            <nav class="flex-1 overflow-y-auto py-4">
+                <ul>
+                    <li><a href="#" onclick="resetAndShowDashboard()" id="nav-dashboard" class="flex items-center px-6 py-3 hover:bg-gray-800 active-tab transition-colors"><i class="fas fa-chart-line w-6"></i><span>Visão Geral</span></a></li>
+                    <li><a href="#" onclick="showPage('summary')" id="nav-summary" class="flex items-center px-6 py-3 hover:bg-gray-800 transition-colors"><i class="fas fa-table w-6"></i><span>Painel Resumido (SLA)</span></a></li>
+                    <li class="px-6 py-2 text-xs uppercase text-gray-500 font-bold mt-4">Distribuição</li>
+                    <li><a href="#" onclick="filterDistribution('RJ')" class="flex items-center px-6 py-2 hover:bg-gray-800 transition-colors text-sm"><i class="fas fa-truck w-6"></i> <span>Rio de Janeiro (Real Med)</span></a></li>
+                    <li><a href="#" onclick="filterDistribution('RJ2')" class="flex items-center px-6 py-2 hover:bg-gray-800 transition-colors text-sm"><i class="fas fa-shuttle-van w-6"></i> <span>Rio de Janeiro 2 (Frota)</span></a></li>
+                    <li><a href="#" onclick="filterDistribution('SP')" class="flex items-center px-6 py-2 hover:bg-gray-800 transition-colors text-sm"><i class="fas fa-city w-6"></i> <span>São Paulo</span></a></li>
+                    <li><a href="#" onclick="filterDistribution('ES')" class="flex items-center px-6 py-2 hover:bg-gray-800 transition-colors text-sm"><i class="fas fa-map-marked-alt w-6"></i> <span>Espírito Santo</span></a></li>
+                    <li><a href="#" onclick="filterDistribution('HM7')" class="flex items-center px-6 py-2 hover:bg-gray-800 transition-colors text-sm"><i class="fas fa-sun w-6"></i> <span>BA / NE / MG (HM7)</span></a></li>
+                    <li class="px-6 py-2 text-xs uppercase text-gray-500 font-bold mt-4">Gestão</li>
+                    <li><a href="#" onclick="showPage('data')" id="nav-data" class="flex items-center px-6 py-3 hover:bg-gray-800 transition-colors"><i class="fas fa-database w-6"></i><span>Gerenciar Dados</span></a></li>
+                    <li><a href="#" onclick="showPage('upload')" id="nav-upload" class="flex items-center px-6 py-3 hover:bg-gray-800 transition-colors"><i class="fas fa-file-upload w-6"></i><span>Importar Arquivo</span></a></li>
+                </ul>
+            </nav>
+            <div class="p-4 border-t border-gray-700 text-xs text-gray-400 text-center">v2.7.0 (Fix Filtros & RJ)</div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 relative">
+            <header class="md:hidden bg-fb-dark text-white p-4 flex justify-between items-center sticky top-0 z-40">
+                <span class="font-bold text-fb-pink">Face Beautiful</span>
+                <button onclick="alert('Use desktop para melhor experiência')" class="text-white"><i class="fas fa-bars"></i></button>
+            </header>
+
+            <div class="bg-white p-4 shadow-sm sticky top-0 z-30">
+                <div class="flex flex-wrap gap-4 items-center justify-between">
+                    <h2 id="pageTitle" class="text-xl font-bold text-gray-800">Dashboard Geral</h2>
+                    <div class="flex gap-2" id="filterContainer">
+                        <select id="filterYear" onchange="applyFilters()" class="border rounded px-3 py-1 text-sm bg-gray-50">
+                            <!-- ALTERAÇÃO: Default agora é ALL para mostrar dados de 2026/2025 sem esconder nada -->
+                            <option value="all" selected>Todos os Anos</option>
+                            <option value="2025">2025</option>
+                            <option value="2026">2026</option>
+                        </select>
+                        <select id="filterMonth" onchange="applyFilters()" class="border rounded px-3 py-1 text-sm bg-gray-50"><option value="all">Todos os Meses</option><option value="JANEIRO">Janeiro</option><option value="FEVEREIRO">Fevereiro</option><option value="MARÇO">Março</option><option value="ABRIL">Abril</option><option value="MAIO">Maio</option><option value="JUNHO">Junho</option><option value="JULHO">Julho</option><option value="AGOSTO">Agosto</option><option value="SETEMBRO">Setembro</option><option value="OUTUBRO">Outubro</option><option value="NOVEMBRO">Novembro</option><option value="DEZEMBRO">Dezembro</option></select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6">
+                <!-- Dashboard -->
+                <div id="page-dashboard" class="page-section">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                        <div class="bg-white rounded-lg shadow p-5 border-l-4 border-blue-500"><div><p class="text-sm text-gray-500 font-bold">Faturamento Total</p><h3 class="text-2xl font-bold text-gray-800" id="kpi-faturamento">R$ 0,00</h3></div></div>
+                        <div class="bg-white rounded-lg shadow p-5 border-l-4 border-green-500"><div><p class="text-sm text-gray-500 font-bold">Entregas Realizadas</p><h3 class="text-2xl font-bold text-gray-800" id="kpi-entregas">0</h3></div></div>
+                        <div class="bg-white rounded-lg shadow p-5 border-l-4 border-yellow-500"><div><p class="text-sm text-gray-500 font-bold">Pendentes</p><h3 class="text-2xl font-bold text-gray-800" id="kpi-pendentes">0</h3></div></div>
+                        <div class="bg-white rounded-lg shadow p-5 border-l-4 border-purple-500"><div><p class="text-sm text-gray-500 font-bold">Ticket Médio</p><h3 class="text-2xl font-bold text-gray-800" id="kpi-ticket">R$ 0,00</h3></div></div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        <div class="bg-white rounded-lg shadow p-5 col-span-2"><h3 class="font-bold text-gray-700 mb-4">Evolução Mensal (Entregues vs Pendentes)</h3><canvas id="chartEvolution" height="150"></canvas></div>
+                        <div class="bg-white rounded-lg shadow p-5"><h3 class="font-bold text-gray-700 mb-4">Status das Entregas</h3><div class="relative h-64"><canvas id="chartStatus"></canvas></div></div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-white rounded-lg shadow p-5"><h3 class="font-bold text-gray-700 mb-4">Top Cidades (Vendas)</h3><div class="overflow-y-auto h-80"><table class="min-w-full text-sm table-compact"><thead class="bg-gray-50 sticky top-0 z-10"><tr><th class="px-4 py-2 text-left">Cidade</th><th class="px-4 py-2 text-center">NFs</th><th class="px-4 py-2 text-right">Valor Total</th></tr></thead><tbody id="tableTopCities" class="divide-y divide-gray-100"></tbody></table></div></div>
+                        <div class="bg-white rounded-lg shadow p-5"><h3 class="font-bold text-gray-700 mb-4">Top Clientes</h3><div class="overflow-y-auto h-80"><table class="min-w-full text-sm table-compact"><thead class="bg-gray-50 sticky top-0 z-10"><tr><th class="px-4 py-2 text-left">Cliente</th><th class="px-4 py-2 text-center">NFs</th><th class="px-4 py-2 text-right">Valor Total</th></tr></thead><tbody id="tableTopClients" class="divide-y divide-gray-100"></tbody></table></div></div>
+                    </div>
+                </div>
+
+                <!-- Painel Resumido -->
+                <div id="page-summary" class="page-section hidden">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-gray-800">Painel de Performance e SLA</h3><button onclick="exportTableToCSV('summaryTable', 'painel_sla.csv')" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"><i class="fas fa-file-excel mr-1"></i> Exportar</button></div>
+                        <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200" id="summaryTable"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transportador / Região</th><th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Doc. Emitidos</th><th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Entregues</th><th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Pendentes</th><th class="px-6 py-3 text-center text-xs font-medium text-green-600 uppercase">No Prazo</th><th class="px-6 py-3 text-center text-xs font-medium text-red-600 uppercase">Fora do Prazo</th><th class="px-6 py-3 text-center text-xs font-medium text-blue-600 uppercase">% SLA</th></tr></thead><tbody class="bg-white divide-y divide-gray-200" id="slaTableBody"></tbody><tfoot class="bg-gray-100 font-bold" id="slaTableFoot"></tfoot></table></div>
+                    </div>
+                </div>
+
+                <!-- Gerenciar Dados -->
+                <div id="page-data" class="page-section hidden">
+                    <div class="bg-white rounded-lg shadow p-4 md:p-6">
+                        <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                            <h3 class="font-bold text-lg text-gray-800">Gerenciamento de Dados</h3>
+                            <div class="flex gap-2 relative z-50">
+                                <button id="btnColumnSelector" onclick="toggleColumnMenu(event)" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded shadow-sm text-sm flex items-center font-medium"><i class="fas fa-columns mr-2 text-fb-pink"></i> Colunas</button>
+                                <div class="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-xl hidden flex flex-col max-h-[400px]" id="columnSelector">
+                                    <div class="p-3 bg-gray-50 border-b flex justify-between items-center"><span>Exibir Colunas</span><button onclick="toggleColumnMenu(event)"><i class="fas fa-times"></i></button></div>
+                                    <div class="overflow-y-auto custom-scrollbar p-2 flex-1"><div class="text-xs font-bold text-fb-pink mb-2 uppercase px-1">Principais</div><div class="space-y-1" id="mainColumnsList"></div><div class="border-t my-2"></div><div class="text-xs font-bold text-gray-500 mb-2 uppercase px-1">Extras</div><div id="extraColumnsList" class="space-y-1"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto custom-scrollbar border-t border-x rounded-t-lg bg-gray-50 relative z-0" id="topScrollContainer" onscroll="syncScroll('top')"><div style="height: 1px;" id="topScrollWidth"></div></div>
+                        <div class="overflow-x-auto custom-scrollbar border rounded-b-lg relative z-0 max-h-[600px]" id="dataTableContainer" onscroll="syncScroll('table')">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm table-compact w-full relative" id="dataTable"><thead class="bg-gray-50 sticky top-0 z-30 shadow-sm" id="dataTableHeader"></thead><tbody class="bg-white divide-y divide-gray-200" id="dataTableBody"></tbody></table>
+                        </div>
+                        <div class="flex justify-between items-center mt-4 pt-4 border-t"><span class="text-xs md:text-sm text-gray-500" id="paginationInfo">Mostrando 0-0</span><div class="flex gap-1"><button onclick="changePage(-1)" class="px-3 py-1 border rounded hover:bg-gray-100"><i class="fas fa-chevron-left"></i></button><button onclick="changePage(1)" class="px-3 py-1 border rounded hover:bg-gray-100"><i class="fas fa-chevron-right"></i></button></div></div>
+                    </div>
+                </div>
+
+                <!-- Upload -->
+                <div id="page-upload" class="page-section hidden">
+                    <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow text-center">
+                        <h2 class="text-2xl font-bold mb-6 text-gray-800">Atualização de Dados</h2>
+                        <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-700 text-left text-sm"><p>Instruções: Utilize o arquivo padrão. Os dados anteriores serão substituídos.</p></div>
+                        <label for="dropzone-file" class="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"><i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i><p class="text-sm text-gray-500">Clique ou arraste o arquivo</p><input id="dropzone-file" type="file" class="hidden" accept=".xlsx, .xls, .csv" onchange="handleFileSelect(event)" /></label>
+                        <div id="fileInfo" class="mt-4 hidden"><p class="font-bold text-gray-700" id="fileName"></p><button onclick="processAndUpload()" class="mt-4 bg-fb-pink hover:bg-pink-700 text-white font-bold py-2 px-6 rounded shadow">Processar e Salvar</button></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, writeBatch, doc, query, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+        Chart.register(ChartDataLabels);
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDOwVY6SkYG_tpZ9BhTXecQW_q1AUd780U",
+            authDomain: "monitoramentodistribuicaoale.firebaseapp.com",
+            projectId: "monitoramentodistribuicaoale",
+            storageBucket: "monitoramentodistribuicaoale.firebasestorage.app",
+            messagingSenderId: "205202683264",
+            appId: "1:205202683264:web:0c51ae409f1290f82e3d65",
+            measurementId: "G-LT51SFZDT8"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let rawData = [];
+        let filteredData = [];
+        let charts = {};
+        let currentDistributionFilter = null;
+        let fileToUpload = null;
+        let fileDataToProcess = []; // Armazenar dados temporariamente
+        let currentPage = 1;
+        const rowsPerPage = 50;
+        
+        // Colunas Padrão Atualizadas
+        let visibleColumns = ['nota_fiscal', 'cliente', 'cidade', 'uf', 'valor_nf', 'status_de_entrega', 'transportador', 'emissao', 'entrega_data']; 
+        let allAvailableColumns = new Set();
+        let editingDocId = null;
+
+        window.initApp = async () => {
+             document.getElementById('loadingOverlay').classList.remove('hidden');
+            try { await signInAnonymously(auth); await fetchData(); } catch (error) { alert("Erro ao conectar no Firebase: " + error.message); } finally { document.getElementById('loadingOverlay').classList.add('hidden'); }
+        };
+
+        async function fetchData() {
+            document.getElementById('loadingText').innerText = "Baixando dados...";
+            try {
+                const q = query(collection(db, "entregas")); 
+                const querySnapshot = await getDocs(q);
+                rawData = []; allAvailableColumns.clear();
+                const ignoredColumns = ['_id', 'mes', 'ano', 'sla', 'ocorrencia', 'status_detalhado', 'manifesto']; 
+
+                querySnapshot.forEach((docSnap) => {
+                    const d = docSnap.data(); d._id = docSnap.id; rawData.push(d);
+                    Object.keys(d).forEach(k => {
+                        if(!k.startsWith('_') && !ignoredColumns.includes(k) && !visibleColumns.includes(k)) { allAvailableColumns.add(k); }
+                    });
+                });
+                applyFilters(); updateColumnSelector();
+            } catch (error) { console.error("Erro dados:", error); }
+        }
+
+        window.handleFileSelect = (event) => {
+            const file = event.target.files[0];
+            if (file) { document.getElementById('fileInfo').classList.remove('hidden'); document.getElementById('fileName').innerText = file.name; fileToUpload = file; }
+        };
+
+        window.processAndUpload = () => {
+            if (!fileToUpload) { alert("Selecione um arquivo."); return; }
+            document.getElementById('processModal').classList.remove('hidden');
+            document.getElementById('processConfirmContent').classList.add('hidden');
+            document.getElementById('processProgressContent').classList.add('hidden');
+            document.getElementById('processSuccessContent').classList.add('hidden');
+            document.getElementById('btnCloseProcess').classList.remove('hidden');
+            document.getElementById('uploadStats').classList.add('hidden');
+
+            // Ler o arquivo primeiro para contar linhas
+            const reader = new FileReader();
+            reader.readAsArrayBuffer(fileToUpload);
+            reader.onload = (e) => {
+                 try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" }); // defval garante que colunas vazias não quebrem a linha, mas aqui queremos contar linhas
+                    fileDataToProcess = jsonData;
+                    
+                    document.getElementById('linesFoundCount').innerText = fileDataToProcess.length;
+                    document.getElementById('uploadStats').classList.remove('hidden');
+                    document.getElementById('processConfirmContent').classList.remove('hidden');
+                 } catch(err) {
+                     alert("Erro ao ler arquivo: " + err.message);
+                     closeProcessModal();
+                 }
+            };
+        };
+
+        window.closeProcessModal = () => { document.getElementById('processModal').classList.add('hidden'); };
+        function updateProgress(title, detail, percent) { document.getElementById('progressStepTitle').innerText = title; document.getElementById('progressStepDetail').innerText = detail; document.getElementById('progressBar').style.width = percent + '%'; document.getElementById('progressPercent').innerText = percent + '%'; }
+
+        window.startUploadProcess = async () => {
+            document.getElementById('processConfirmContent').classList.add('hidden');
+            document.getElementById('processProgressContent').classList.remove('hidden');
+            document.getElementById('btnCloseProcess').classList.add('hidden');
+            updateProgress("Iniciando", "Conectando...", 5);
+
+            try {
+                // 1. Limpar
+                const colRef = collection(db, "entregas");
+                const q = query(colRef);
+                updateProgress("Limpando", "Removendo dados antigos...", 10);
+                const snapshot = await getDocs(q);
+                const deleteBatchSize = 400;
+                for (let i = 0; i < snapshot.docs.length; i += deleteBatchSize) {
+                    const batch = writeBatch(db);
+                    const chunk = snapshot.docs.slice(i, i + deleteBatchSize);
+                    chunk.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                }
+
+                // 2. Processar Dados (já lidos anteriormente)
+                updateProgress("Processando", "Preparando dados...", 30);
+                
+                const processedData = fileDataToProcess.map(row => {
+                    const normalize = (str) => str ? str.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+                    const getVal = (keys) => {
+                        for(let k of keys) {
+                            if(row[k] !== undefined) return row[k];
+                            for(let rk of Object.keys(row)) { if(normalize(rk) === normalize(k)) return row[rk]; }
+                        }
+                        return undefined;
+                    };
+
+                    // Mapeamento
+                    let nf = getVal(['NOTA FISCAL', 'NF', 'NFe']) || 'S/N';
+                    let clienteRaw = getVal(['CLIENTES', 'DESTINATARIO', 'CLIENTE']) || 'Consumidor';
+                    let dataEmissaoRaw = getVal(['EMISSÃO', 'DATA', 'EMISSAO']);
+                    let dataEntregaRaw = getVal(['ENTREGA DATA', 'DATA ENTREGA']);
+                    let valor = parseFloat(getVal(['VALOR NF', 'VALOR']) || 0);
+                    let estado = getVal(['UF', 'ESTADO']) || 'INDEFINIDO';
+                    let statusRaw = getVal(['STATUS DE ENTREGA', 'STATUS']) || 'PENDENTE';
+                    let statusSlaRaw = getVal(['STATUS DE SLA', 'STATUS SLA', 'SLA']);
+                    let transportadorVal = getVal(['TRANSPORTADOR', 'TRANSPORTADORA']);
+
+                    // Extração de Cidade Aprimorada
+                    let cidade = 'INDEFINIDO';
+                    let clienteNome = clienteRaw;
+
+                    if (typeof clienteRaw === 'string') {
+                        if (clienteRaw.includes(',')) {
+                            const parts = clienteRaw.split(',');
+                            const lastPart = parts[parts.length - 1].trim(); 
+                            if (lastPart.includes('-')) {
+                                const cityParts = lastPart.split('-');
+                                if (cityParts.length >= 2) {
+                                    cidade = cityParts[cityParts.length - 2].trim().toUpperCase();
+                                } else {
+                                    cidade = cityParts[0].trim().toUpperCase();
+                                }
+                            } else {
+                                cidade = lastPart.toUpperCase();
+                            }
+                            clienteNome = parts.slice(0, parts.length - 1).join(',').trim();
+                        } else if (clienteRaw.includes('-')) {
+                                const parts = clienteRaw.split('-');
+                                if (parts.length > 2) {
+                                    cidade = parts[parts.length - 2].trim().toUpperCase();
+                                    clienteNome = parts.slice(0, parts.length - 2).join('-').trim();
+                                }
+                        }
+                    }
+                    
+                    if (cidade === 'INDEFINIDO' || cidade.length < 3) {
+                        let c = getVal(['CIDADES', 'CIDADE']);
+                        if(c) cidade = c.toUpperCase();
+                    }
+
+                    // Datas
+                    let dataEmissao = parseExcelDate(dataEmissaoRaw);
+                    let dataEntrega = parseExcelDate(dataEntregaRaw);
+                    
+                    // Status
+                    let status = statusRaw.toString().toUpperCase();
+                    let simplifiedStatus = 'PENDENTE';
+                    if (status.includes('ENTREGUE')) simplifiedStatus = 'ENTREGUE';
+                    
+                    // SLA
+                    let slaStatus = 'NO PRAZO';
+                    if (statusSlaRaw && statusSlaRaw.toString().toUpperCase().includes('FORA')) slaStatus = 'FORA DO PRAZO';
+                    else if (status.includes('FORA DO PRAZO')) slaStatus = 'FORA DO PRAZO';
+
+                    // Distribuição
+                    let transportadorClass = 'OUTROS';
+                    const ufClean = estado.toString().trim().toUpperCase();
+                    const transClean = transportadorVal ? transportadorVal.toString().toUpperCase() : '';
+
+                    if (ufClean === 'SP') transportadorClass = 'DISTRIBUIÇÃO SP';
+                    else if (ufClean === 'ES') transportadorClass = 'DISTRIBUIÇÃO ES';
+                    else if (['BA','PE','PB','AL','SE','RN','CE','MA','PI','MG'].includes(ufClean)) transportadorClass = 'HM7';
+                    else if (ufClean === 'RJ') {
+                        // Verifica se "REALMED" aparece no nome do transportador, independente de case
+                        if (transClean.includes('REALMED') || transClean.includes('REAL MED')) {
+                            transportadorClass = 'REAL MED';
+                        } else {
+                            transportadorClass = 'DISTRIBUIÇÃO RJ 2';
+                        }
+                    }
+
+                    const newItem = {
+                        nota_fiscal: nf,
+                        cliente: clienteNome,
+                        cliente_full: clienteRaw,
+                        cidade: cidade,
+                        uf: ufClean,
+                        valor_nf: valor,
+                        transportador: transportadorClass,
+                        transportador_original: transportadorVal || '',
+                        emissao: dataEmissao ? dataEmissao.toISOString() : null,
+                        entrega_data: dataEntrega ? dataEntrega.toISOString() : null,
+                        status_de_entrega: simplifiedStatus,
+                        status_original: status,
+                        sla: slaStatus,
+                        mes: getMonthName(dataEmissao),
+                        ano: dataEmissao ? dataEmissao.getFullYear().toString() : '2026' // Fallback para 2026 dado o contexto
+                    };
+                    return newItem;
+                });
+
+                // 3. Upload - IMPORTANTE: Usando ID Automático para evitar sobrescrever NFs duplicadas
+                updateProgress("Enviando", `Salvando ${processedData.length} registros...`, 50);
+                const batchSize = 400;
+                const totalItems = processedData.length;
+                let processedCount = 0;
+
+                for (let i = 0; i < totalItems; i += batchSize) {
+                    const batch = writeBatch(db);
+                    const chunk = processedData.slice(i, i + batchSize);
+                    chunk.forEach(item => {
+                        // Gera um ID novo para cada linha, garantindo que duplicatas de NF sejam salvas
+                        const newDocRef = doc(collection(db, "entregas")); 
+                        batch.set(newDocRef, item);
+                    });
+                    await batch.commit();
+                    processedCount += chunk.length;
+                    updateProgress("Enviando", `Salvando... (${Math.round((processedCount/totalItems)*100)}%)`, 50 + Math.round((processedCount/totalItems)*50));
+                }
+
+                // Forçar reset do filtro visual e atualizar UI
+                document.getElementById('filterYear').value = 'all';
+                document.getElementById('filterMonth').value = 'all';
+
+                document.getElementById('successMessage').innerText = `${processedCount} registros processados com sucesso.`;
+                document.getElementById('processProgressContent').classList.add('hidden');
+                document.getElementById('processSuccessContent').classList.remove('hidden');
+                document.getElementById('btnCloseProcess').classList.remove('hidden');
+
+            } catch (error) { alert("Erro DB: " + error.message); closeProcessModal(); }
+        };
+
+        window.finishProcess = async () => { closeProcessModal(); await fetchData(); resetAndShowDashboard(); };
+
+        // --- Helpers ---
+        function parseExcelDate(val) {
+            if (!val) return null;
+            let date;
+            if (typeof val === 'number') date = new Date(Math.round((val - 25569) * 86400 * 1000));
+            else {
+                const s = val.toString().trim();
+                // Tenta formato YYYY-MM-DD ou DD/MM/YYYY
+                if (s.match(/^\d{4}-\d{2}-\d{2}/)) { // ISO
+                    date = new Date(s);
+                } else if (s.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}/)) { // BR
+                    const p = s.split('/');
+                    const y = p[2].length === 2 ? '20'+p[2] : p[2];
+                    date = new Date(`${y}-${p[1]}-${p[0]}`);
+                } else if (s.includes('.')) { 
+                    const p = s.split('.'); 
+                    date = new Date(`${p[2]}-${p[1]}-${p[0]}`); 
+                } else {
+                    date = new Date(s);
+                }
+            }
+            return (date instanceof Date && !isNaN(date)) ? date : null;
+        }
+        function getMonthName(d) { if(!d) return 'INDEFINIDO'; return ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"][d.getMonth()]; }
+
+        // --- Interface ---
+        window.resetAndShowDashboard = () => {
+             currentDistributionFilter = null;
+             document.getElementById('pageTitle').innerText = "Dashboard Geral";
+             document.getElementById('filterYear').value = 'all'; // Reset visual
+             showPage('dashboard');
+             applyFilters();
+        };
+
+        window.showPage = (pageId) => {
+            document.querySelectorAll('.page-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`page-${pageId}`).classList.remove('hidden');
+            document.querySelectorAll('nav a').forEach(el => el.classList.remove('active-tab'));
+            document.getElementById(`nav-${pageId}`).classList.add('active-tab');
+            
+            // Logica especifica da pagina
+            if(pageId === 'dashboard') { 
+                // Nao resetar filtro aqui, pois pode vir do filterDistribution
+                applyFilters(); 
+            }
+            else if(pageId === 'summary') { document.getElementById('pageTitle').innerText = "Painel Resumido"; renderSummaryTable(filteredData); }
+            else if(pageId === 'data') { document.getElementById('pageTitle').innerText = "Gerenciar Dados"; currentPage = 1; renderDataTable(); syncScroll('table'); }
+        };
+
+        window.filterDistribution = (type) => {
+            currentDistributionFilter = type;
+            const titles = { 'RJ': 'Rio de Janeiro (Real Med)', 'RJ2': 'Rio de Janeiro 2 (Frota)', 'SP': 'São Paulo', 'ES': 'Espírito Santo', 'HM7': 'BA / NE / MG (HM7)' };
+            document.getElementById('pageTitle').innerText = titles[type] || "Dashboard";
+            
+            // Apenas muda visualmente para dashboard, sem resetar
+            document.querySelectorAll('.page-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`page-dashboard`).classList.remove('hidden');
+            document.querySelectorAll('nav a').forEach(el => el.classList.remove('active-tab'));
+            
+            applyFilters();
+        };
+
+        window.applyFilters = () => {
+            const year = document.getElementById('filterYear').value;
+            const month = document.getElementById('filterMonth').value;
+            
+            // Map keys
+            const distMap = {
+                'RJ': 'REAL MED',
+                'RJ2': 'DISTRIBUIÇÃO RJ 2',
+                'SP': 'DISTRIBUIÇÃO SP',
+                'ES': 'DISTRIBUIÇÃO ES',
+                'HM7': 'HM7'
+            };
+
+            filteredData = rawData.filter(item => {
+                let passYear = (year === 'all') || (item.ano === year);
+                let passMonth = (month === 'all') || (item.mes === month);
+                let passDist = true;
+                if (currentDistributionFilter) {
+                    passDist = item.transportador === distMap[currentDistributionFilter];
+                }
+                return passYear && passMonth && passDist;
+            });
+
+            if (!document.getElementById('page-dashboard').classList.contains('hidden')) updateDashboardUI();
+            if (!document.getElementById('page-summary').classList.contains('hidden')) renderSummaryTable(filteredData);
+            if (!document.getElementById('page-data').classList.contains('hidden')) { currentPage = 1; renderDataTable(); }
+        };
+
+        function updateDashboardUI() {
+            const totalFat = filteredData.reduce((acc, curr) => acc + (curr.valor_nf || 0), 0);
+            const totalEntregues = filteredData.filter(d => d.status_de_entrega === 'ENTREGUE').length;
+            const totalPendentes = filteredData.filter(d => d.status_de_entrega === 'PENDENTE').length;
+            const ticket = filteredData.length > 0 ? (totalFat / filteredData.length) : 0; 
+            
+            document.getElementById('kpi-faturamento').innerText = totalFat.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            document.getElementById('kpi-entregas').innerText = totalEntregues;
+            document.getElementById('kpi-pendentes').innerText = totalPendentes;
+            document.getElementById('kpi-ticket').innerText = ticket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            
+            renderCharts(); 
+            renderTopTables();
+        }
+
+        function renderTopTables() {
+            const aggregate = (keyFunc) => {
+                const map = {};
+                filteredData.forEach(d => {
+                    const k = keyFunc(d); if (!k || k === 'INDEFINIDO') return;
+                    if (!map[k]) map[k] = { val: 0, count: 0 };
+                    map[k].val += (d.valor_nf || 0); map[k].count += 1;
+                });
+                return Object.entries(map).sort((a, b) => b[1].val - a[1].val).slice(0, 10);
+            };
+            const sortedCities = aggregate(d => d.cidade);
+            document.getElementById('tableTopCities').innerHTML = sortedCities.map(([k, v]) => `<tr><td class="px-4 py-2 border-b">${k}</td><td class="px-4 py-2 text-center border-b">${v.count}</td><td class="px-4 py-2 text-right border-b font-bold">${v.val.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</td></tr>`).join('');
+            const sortedClients = aggregate(d => d.cliente ? d.cliente.substring(0,25) : 'Indefinido');
+            document.getElementById('tableTopClients').innerHTML = sortedClients.map(([k, v]) => `<tr><td class="px-4 py-2 border-b">${k}...</td><td class="px-4 py-2 text-center border-b">${v.count}</td><td class="px-4 py-2 text-right border-b font-bold">${v.val.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</td></tr>`).join('');
+        }
+
+        function renderSummaryTable(data) {
+            const tableBody = document.getElementById('slaTableBody');
+            const tableFoot = document.getElementById('slaTableFoot');
+            
+            // Inicializar fixo com todos
+            const cats = {
+                'REAL MED': { name: 'Rio de Janeiro (Real Med)', emit:0, ent:0, pen:0, ok:0, nok:0 },
+                'DISTRIBUIÇÃO RJ 2': { name: 'Rio de Janeiro 2 (Frota)', emit:0, ent:0, pen:0, ok:0, nok:0 },
+                'DISTRIBUIÇÃO SP': { name: 'São Paulo', emit:0, ent:0, pen:0, ok:0, nok:0 },
+                'DISTRIBUIÇÃO ES': { name: 'Espírito Santo', emit:0, ent:0, pen:0, ok:0, nok:0 },
+                'HM7': { name: 'Bahia / NE / MG (HM7)', emit:0, ent:0, pen:0, ok:0, nok:0 }
+            };
+
+            data.forEach(d => {
+                if (cats[d.transportador]) {
+                    const c = cats[d.transportador];
+                    c.emit++;
+                    if(d.status_de_entrega === 'ENTREGUE') {
+                        c.ent++;
+                        if(d.sla === 'NO PRAZO') c.ok++; else c.nok++;
+                    } else if (d.status_de_entrega === 'PENDENTE') {
+                        c.pen++;
+                    }
+                }
+            });
+
+            let html = '';
+            let t = { emit:0, ent:0, pen:0, ok:0, nok:0 };
+
+            Object.values(cats).forEach(c => {
+                t.emit+=c.emit; t.ent+=c.ent; t.pen+=c.pen; t.ok+=c.ok; t.nok+=c.nok;
+                const sla = c.ent > 0 ? ((c.ok/c.ent)*100).toFixed(1) : '0.0';
+                const color = sla >= 95 ? 'text-green-600' : (sla >= 80 ? 'text-yellow-600' : 'text-red-600');
+                html += `<tr><td class="px-6 py-4 text-sm font-medium text-gray-900">${c.name}</td><td class="px-6 py-4 text-center text-sm text-gray-500">${c.emit}</td><td class="px-6 py-4 text-center text-sm text-gray-500">${c.ent}</td><td class="px-6 py-4 text-center text-sm font-bold text-yellow-600 bg-yellow-50">${c.pen}</td><td class="px-6 py-4 text-center text-sm text-green-600">${c.ok}</td><td class="px-6 py-4 text-center text-sm text-red-600">${c.nok}</td><td class="px-6 py-4 text-center text-sm ${color}">${sla}%</td></tr>`;
+            });
+            
+            tableBody.innerHTML = html;
+            const totalSla = t.ent > 0 ? ((t.ok/t.ent)*100).toFixed(1) : '0.0';
+            tableFoot.innerHTML = `<tr><td class="px-6 py-3 text-left">TOTAL GERAL</td><td class="px-6 py-3 text-center">${t.emit}</td><td class="px-6 py-3 text-center">${t.ent}</td><td class="px-6 py-3 text-center">${t.pen}</td><td class="px-6 py-3 text-center">${t.ok}</td><td class="px-6 py-3 text-center">${t.nok}</td><td class="px-6 py-3 text-center">${totalSla}%</td></tr>`;
+        }
+
+        // --- Gráficos, Data Grid, Export --- (Funções auxiliares padrão mantidas e otimizadas)
+        function renderCharts() {
+            const sc = { 'ENTREGUE': 0, 'PENDENTE': 0, 'DEVOLVIDO': 0 }; filteredData.forEach(d => { if(sc[d.status_de_entrega] !== undefined) sc[d.status_de_entrega]++; });
+            if(charts.status) charts.status.destroy(); charts.status = new Chart(document.getElementById('chartStatus'), { type: 'doughnut', data: { labels: Object.keys(sc), datasets: [{ data: Object.values(sc), backgroundColor: ['#10B981', '#F59E0B', '#EF4444'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { datalabels: { color: '#fff' } } } });
+            
+            const months = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+            const md = {}; filteredData.forEach(d => { if (!md[d.mes]) md[d.mes] = { e: 0, p: 0 }; if (d.status_de_entrega === 'ENTREGUE') md[d.mes].e++; if (d.status_de_entrega === 'PENDENTE') md[d.mes].p++; });
+            const labels = Object.keys(md).sort((a, b) => months.indexOf(a) - months.indexOf(b));
+            if(charts.evo) charts.evo.destroy(); charts.evo = new Chart(document.getElementById('chartEvolution'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'Entregues', data: labels.map(l=>md[l].e), backgroundColor: '#10B981' }, { label: 'Pendentes', data: labels.map(l=>md[l].p), backgroundColor: '#F59E0B' }] }, options: { responsive: true, plugins: { datalabels: { anchor: 'end', align: 'end' } } } });
+        }
+
+        window.toggleColumnMenu = (e) => { e.stopPropagation(); document.getElementById('columnSelector').classList.toggle('hidden'); };
+        window.toggleColumn = (c) => { if(visibleColumns.includes(c)) visibleColumns = visibleColumns.filter(x=>x!==c); else visibleColumns.push(c); renderDataTable(); };
+        window.syncScroll = (s) => { const a = document.getElementById('topScrollContainer'), b = document.getElementById('dataTableContainer'); if(s==='top') b.scrollLeft=a.scrollLeft; else a.scrollLeft=b.scrollLeft; };
+        
+        function updateColumnSelector() {
+            const list = document.getElementById('extraColumnsList'); list.innerHTML = '';
+            document.getElementById('mainColumnsList').innerHTML = visibleColumns.map(c => `<label class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"><input type="checkbox" checked onchange="toggleColumn('${c}')" class="mr-2 text-fb-pink rounded border-gray-300"> <span class="text-sm capitalize">${c.replace('_',' ')}</span></label>`).join('');
+            Array.from(allAvailableColumns).sort().forEach(col => {
+                list.innerHTML += `<label class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"><input type="checkbox" onchange="toggleColumn('${col}')" class="mr-2 text-fb-pink rounded border-gray-300"> <span class="text-sm capitalize truncate">${col.replace('_',' ')}</span></label>`;
+            });
+        }
+
+        function renderDataTable() {
+            const thead = document.getElementById('dataTableHeader'); const tbody = document.getElementById('dataTableBody');
+            thead.innerHTML = `<tr><th class="px-2 py-1 bg-gray-100 sticky left-0 z-30 border-b w-10">Ação</th>${visibleColumns.map(c=>`<th class="px-2 py-1 text-left border-b font-semibold text-gray-600 bg-gray-50">${c.replace('_',' ')}</th>`).join('')}</tr>`;
+            const start = (currentPage - 1) * rowsPerPage; const pageData = filteredData.slice(start, start + rowsPerPage);
+            tbody.innerHTML = pageData.map(r => `<tr class="hover:bg-blue-50"><td class="px-2 py-1 border-b sticky left-0 bg-white z-10 text-center"><button onclick="openEditModal('${r._id}')" class="text-gray-400 hover:text-fb-pink"><i class="fas fa-pen"></i></button></td>${visibleColumns.map(c => `<td class="px-2 py-1 border-b text-gray-700 whitespace-nowrap">${(c==='valor_nf' || c.includes('valor')) && r[c]?r[c].toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):r[c]||''}</td>`).join('')}</tr>`).join('');
+            document.getElementById('topScrollWidth').style.width = document.getElementById('dataTable').offsetWidth + 'px';
+            document.getElementById('paginationInfo').innerText = `Mostrando ${start+1}-${Math.min(start+rowsPerPage, filteredData.length)} de ${filteredData.length}`;
+        }
+        window.changePage = (d) => { const max = Math.ceil(filteredData.length/rowsPerPage); const n = currentPage + d; if(n>=1 && n<=max) { currentPage = n; renderDataTable(); } };
+        
+        // Edit functions
+        window.openEditModal = (id) => {
+            const r = rawData.find(x => x._id === id); if(!r) return; editingDocId = id;
+            document.getElementById('modalFormFields').innerHTML = Object.keys(r).filter(k=>!k.startsWith('_')).sort().map(k => `<div class="flex flex-col"><label class="text-xs font-bold text-gray-500 uppercase mb-1">${k.replace('_',' ')}</label><input type="text" id="edit_${k}" value="${r[k]||''}" class="border rounded px-3 py-2 text-sm focus:ring-fb-pink"></div>`).join('');
+            document.getElementById('editModal').classList.remove('hidden');
+        };
+        window.closeEditModal = () => { document.getElementById('editModal').classList.add('hidden'); editingDocId = null; };
+        window.saveEditedRow = async () => {
+            if(!editingDocId) return;
+            const updates = {}; document.querySelectorAll('#modalFormFields input').forEach(i => updates[i.id.replace('edit_','')] = i.id.includes('valor')?parseFloat(i.value):i.value);
+            try { await updateDoc(doc(db, "entregas", editingDocId), updates); const idx = rawData.findIndex(x=>x._id===editingDocId); if(idx!==-1) rawData[idx]={...rawData[idx], ...updates}; closeEditModal(); applyFilters(); alert("Salvo!"); } catch(e){alert(e.message);}
+        };
+        window.exportTableToCSV = (tid, fname) => { /* ... export logic ... */ const t=document.getElementById(tid); let csv=[]; for(let r of t.rows){ let row=[]; for(let c of r.cells) row.push(c.innerText); csv.push(row.join(",")); } const b=new Blob([csv.join("\n")],{type:"text/csv"}); const a=document.createElement("a"); a.download=fname; a.href=window.URL.createObjectURL(b); a.click(); };
+
+        window.addEventListener('load', window.initApp);
+    </script>
+</body>
+</html>
