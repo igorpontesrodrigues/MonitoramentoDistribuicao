@@ -147,21 +147,10 @@
     <div id="appContent" class="flex h-screen hidden">
         <!-- Sidebar -->
         <aside class="w-64 bg-fb-dark text-white flex-shrink-0 hidden md:flex flex-col z-50 shadow-xl">
-            <div class="p-6 border-b border-gray-700 flex flex-col items-center gap-4">
-                <!-- Logos -->
-                <div class="w-full flex justify-between gap-2">
-                    <div class="h-12 w-24 bg-white rounded flex items-center justify-center overflow-hidden p-1">
-                        <!-- Logo da Face Beautiful (icon.png) -->
-                        <img src="icon.png" alt="Face Beautiful" class="h-full w-auto object-contain">
-                    </div>
-                    <div class="h-12 w-24 bg-white rounded flex items-center justify-center overflow-hidden">
-                        <!-- Logo Genérico Transportadora -->
-                        <i class="fas fa-truck text-gray-600 text-xl"></i>
-                    </div>
-                </div>
-                <div class="text-center mt-2">
-                    <p class="text-xs text-gray-400">Usuário Logado</p>
-                    <p class="text-sm font-bold text-white truncate w-48" id="userEmailDisplay">user@email.com</p>
+            <!-- Sidebar Header com Logo Destacada -->
+            <div class="p-6 border-b border-gray-700 flex items-center justify-center">
+                <div class="w-full bg-white rounded-xl p-3 shadow-lg flex items-center justify-center transform hover:scale-105 transition-transform duration-300">
+                    <img src="icon.png" alt="Face Beautiful" class="h-14 w-auto object-contain">
                 </div>
             </div>
             
@@ -612,7 +601,7 @@
             if (user) {
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('appContent').classList.remove('hidden');
-                document.getElementById('userEmailDisplay').innerText = user.email;
+                // Removed userEmailDisplay update as requested
                 fetchData();
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
