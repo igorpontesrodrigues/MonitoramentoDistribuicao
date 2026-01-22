@@ -558,7 +558,7 @@
         const rowsPerPage = 50;
         let activeMetric = 'qtd'; 
         
-        let visibleColumns = ['nota_fiscal', 'emissao', 'cliente', 'cidade', 'uf', 'valor_nf', 'volumes', 'transportador', 'entrega_data', 'status_de_entrega']; 
+        let visibleColumns = ['nota_fiscal', 'emissao', 'cliente', 'cidade', 'uf', 'valor_nf', 'volumes', 'transportador', 'previsao_entrega', 'entrega_data', 'status_de_entrega', 'sla']; 
         let allAvailableColumns = new Set();
         let editingDocId = null;
 
@@ -1128,12 +1128,14 @@
                     let clienteRaw = getVal(['CLIENTES', 'DESTINATARIO', 'CLIENTE']) || 'Consumidor';
                     let dataEmissaoRaw = getVal(['EMISSÃO', 'DATA', 'EMISSAO']);
                     let dataEntregaRaw = getVal(['ENTREGA DATA', 'DATA ENTREGA']);
+                    // NEW: Leitura da Previsão
+                    let dataPrevisaoRaw = getVal(['PREV. ENTREGA DATA', 'PREVISAO', 'PREVISAO ENTREGA', 'DATA PREVISTA']);
+                    
                     let vNfRaw = getVal(['VALOR NF', 'VALOR']);
                     let valor = (vNfRaw === "" || vNfRaw === undefined) ? 0 : parseFloat(vNfRaw);
                     
                     let estado = getVal(['UF', 'ESTADO']) || 'INDEFINIDO';
                     let statusRaw = getVal(['STATUS DE ENTREGA', 'STATUS', 'STATUS DE_ENTREGA', 'STATUS_DE_ENTREGA']) || 'PENDENTE';
-                    let statusSlaRaw = getVal(['STATUS DE SLA', 'STATUS SLA', 'SLA']);
                     let transportadorVal = getVal(['TRANSPORTADOR', 'TRANSPORTADORA']);
                     
                     let vVolRaw = getVal(['VOLUMES', 'VOLUME', 'QTD', 'QUANTIDADE']);
@@ -1174,14 +1176,37 @@
 
                     let dEmissao = parseExcelDate(dataEmissaoRaw);
                     let dEntrega = parseExcelDate(dataEntregaRaw);
+                    let dPrevisao = parseExcelDate(dataPrevisaoRaw);
 
                     let status = statusRaw.toString().toUpperCase();
                     let simplifiedStatus = 'PENDENTE';
                     if (status.includes('ENTREGUE')) simplifiedStatus = 'ENTREGUE';
                     else if (status.includes('DEVOL') || status.includes('AVARIA')) simplifiedStatus = 'DEVOLVIDO';
                     
+                    // Lógica de SLA Calculado
                     let slaStatus = 'NO PRAZO';
-                    if ((statusSlaRaw && statusSlaRaw.toString().toUpperCase().includes('FORA')) || status.includes('FORA DO PRAZO')) slaStatus = 'FORA DO PRAZO';
+                    
+                    if (dPrevisao) {
+                        const dPrev = new Date(dPrevisao);
+                        dPrev.setHours(23, 59, 59, 999); // Final do dia previsto
+
+                        if (simplifiedStatus === 'ENTREGUE' && dEntrega) {
+                            const dEnt = new Date(dEntrega);
+                            dEnt.setHours(0,0,0,0);
+                            const dPrevComp = new Date(dPrevisao);
+                            dPrevComp.setHours(0,0,0,0);
+                            
+                            if (dEnt > dPrevComp) slaStatus = 'FORA DO PRAZO';
+                        } 
+                        else if (simplifiedStatus === 'PENDENTE') {
+                            const today = new Date();
+                            today.setHours(0,0,0,0);
+                            const dPrevComp = new Date(dPrevisao);
+                            dPrevComp.setHours(0,0,0,0);
+                            
+                            if (today > dPrevComp) slaStatus = 'FORA DO PRAZO'; // Atrasado
+                        }
+                    }
 
                     let transportadorClass = 'OUTROS';
                     const ufClean = estado.toString().trim().toUpperCase();
@@ -1210,6 +1235,7 @@
                         transportador_original: transportadorVal || '',
                         emissao: dEmissao ? dEmissao.toISOString() : null,
                         entrega_data: dEntrega ? dEntrega.toISOString() : null,
+                        previsao_entrega: dPrevisao ? dPrevisao.toISOString() : null, // Nova Coluna
                         status_de_entrega: simplifiedStatus,
                         status_original: status,
                         sla: slaStatus,
@@ -1231,7 +1257,7 @@
 
                 alert("Sucesso! Dados atualizados.");
                 fetchData();
-                window.resetAndShowDashboard(); // Call via window
+                window.resetAndShowDashboard(); 
 
             } catch(e) { alert("Erro upload: " + e.message); }
             finally { document.getElementById('loadingOverlay').classList.add('hidden'); }
@@ -1239,12 +1265,13 @@
 
         window.exportAllData = () => {
             if(rawData.length === 0) { alert("Sem dados para exportar."); return; }
-            const exportOrder = ['nota_fiscal', 'emissao', 'cliente', 'cidade', 'uf', 'valor_nf', 'volumes', 'transportador', 'entrega_data', 'status_de_entrega', 'sla'];
+            // Adicionado previsao_entrega na ordem de exportação
+            const exportOrder = ['nota_fiscal', 'emissao', 'cliente', 'cidade', 'uf', 'valor_nf', 'volumes', 'transportador', 'previsao_entrega', 'entrega_data', 'status_de_entrega', 'sla'];
             const ws = XLSX.utils.json_to_sheet(rawData.map(d => {
                 const row = {};
                 exportOrder.forEach(key => {
                     let val = d[key];
-                    if(key.includes('data') || key === 'emissao') {
+                    if(key.includes('data') || key === 'emissao' || key === 'previsao_entrega') {
                         val = val ? new Date(val).toLocaleDateString('pt-BR') : '';
                     }
                     row[key.toUpperCase().replace('_', ' ')] = val;
@@ -1281,7 +1308,7 @@
             const thead = document.getElementById('dataTableHeader'); const tbody = document.getElementById('dataTableBody');
             thead.innerHTML = `<tr><th class="px-2 py-1 bg-gray-100 sticky left-0 z-30 border-b w-10">#</th>${visibleColumns.map(c=>`<th class="px-2 py-3 text-left border-b font-bold text-gray-600 bg-gray-50 uppercase text-xs tracking-wider">${c.replace('_',' ')}</th>`).join('')}</tr>`;
             const start = (currentPage - 1) * rowsPerPage; const pageData = filteredData.slice(start, start + rowsPerPage);
-            tbody.innerHTML = pageData.map(r => `<tr class="hover:bg-blue-50 transition-colors border-b last:border-0"><td class="px-2 py-1 border-b sticky left-0 bg-white z-10 text-center"><button onclick="alert('Edição rápida desativada temporariamente')" class="text-gray-300 hover:text-fb-pink"><i class="fas fa-pen"></i></button></td>${visibleColumns.map(c => `<td class="px-2 py-2 text-gray-700 whitespace-nowrap text-xs">${(c.includes('valor')) && r[c]?formatNumber(r[c], true): (c.includes('data') || c==='emissao' && r[c]) ? new Date(r[c]).toLocaleDateString() : r[c]||''}</td>`).join('')}</tr>`).join('');
+            tbody.innerHTML = pageData.map(r => `<tr class="hover:bg-blue-50 transition-colors border-b last:border-0"><td class="px-2 py-1 border-b sticky left-0 bg-white z-10 text-center"><button onclick="alert('Edição rápida desativada temporariamente')" class="text-gray-300 hover:text-fb-pink"><i class="fas fa-pen"></i></button></td>${visibleColumns.map(c => `<td class="px-2 py-2 text-gray-700 whitespace-nowrap text-xs">${(c.includes('valor')) && r[c]?formatNumber(r[c], true): (c.includes('data') || c==='emissao' || c==='previsao_entrega' && r[c]) ? new Date(r[c]).toLocaleDateString() : r[c]||''}</td>`).join('')}</tr>`).join('');
             document.getElementById('paginationInfo').innerText = `Mostrando ${start+1}-${Math.min(start+rowsPerPage, filteredData.length)} de ${filteredData.length}`;
         }
     </script>
