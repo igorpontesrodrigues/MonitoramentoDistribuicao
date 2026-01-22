@@ -2,6 +2,10 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <!-- Meta tags para evitar Cache -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitoramento Face Beautiful Profissional</title>
     
@@ -552,11 +556,24 @@
         let fileDataToProcess = [];
         let currentPage = 1;
         const rowsPerPage = 50;
-        let activeMetric = 'qtd'; // MUDANÇA: Padrão agora é 'qtd' para "Por Entregas" (Notas)
+        let activeMetric = 'qtd'; 
         
         let visibleColumns = ['nota_fiscal', 'emissao', 'cliente', 'cidade', 'uf', 'valor_nf', 'volumes', 'transportador', 'entrega_data', 'status_de_entrega']; 
         let allAvailableColumns = new Set();
         let editingDocId = null;
+
+        // --- Helper Function: Standard Format ---
+        function formatNumber(value, isCurrency = false) {
+            if (value === undefined || value === null) return '0';
+            
+            const num = parseFloat(value);
+            if (isNaN(num)) return value;
+
+            if (isCurrency) {
+                return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            }
+            return num.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
 
         // --- AUTH LOGIC ---
         window.handleLogin = async (e) => {
@@ -625,7 +642,7 @@
 
                 applyFilters(); 
                 updateColumnSelector();
-                updateDynamicChart(activeMetric); // Inicializa botões corretamente
+                updateDynamicChart(activeMetric); 
             } catch (error) { console.error("Erro dados:", error); alert("Erro ao baixar dados."); }
             finally { document.getElementById('loadingOverlay').classList.add('hidden'); }
         }
@@ -712,15 +729,15 @@
                 }
             });
 
-            document.getElementById('kpi-faturamento').innerText = totalFat.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            document.getElementById('kpi-total-entregas').innerText = totalDocs;
-            document.getElementById('kpi-clientes').innerText = uniqueClients;
-            document.getElementById('kpi-volumes').innerText = totalVols;
+            document.getElementById('kpi-faturamento').innerText = formatNumber(totalFat, true);
+            document.getElementById('kpi-total-entregas').innerText = formatNumber(totalDocs);
+            document.getElementById('kpi-clientes').innerText = formatNumber(uniqueClients);
+            document.getElementById('kpi-volumes').innerText = formatNumber(totalVols);
             
-            document.getElementById('kpi-entregues').innerText = entregues;
-            document.getElementById('kpi-em-rota').innerText = emRota;
-            document.getElementById('kpi-base').innerText = naBase;
-            document.getElementById('kpi-problemas').innerText = problemas;
+            document.getElementById('kpi-entregues').innerText = formatNumber(entregues);
+            document.getElementById('kpi-em-rota').innerText = formatNumber(emRota);
+            document.getElementById('kpi-base').innerText = formatNumber(naBase);
+            document.getElementById('kpi-problemas').innerText = formatNumber(problemas);
 
             renderAllCharts();
             renderTopTables();
@@ -797,11 +814,10 @@
                             anchor: 'end', 
                             align: 'top', 
                             formatter: (val) => {
-                                // CORREÇÃO: Usar R$ completo em vez de k/M
                                 if (activeMetric === 'valor') {
-                                    return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+                                    return formatNumber(val, true);
                                 }
-                                return val;
+                                return formatNumber(val);
                             },
                             font: { size: 10, weight: 'bold' }
                         },
@@ -810,10 +826,7 @@
                                 label: (ctx) => {
                                     let v = ctx.raw;
                                     let label = ctx.dataset.label || '';
-                                    if(activeMetric === 'valor') {
-                                        return label + ': ' + v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-                                    }
-                                    return label + ': ' + v;
+                                    return label + ': ' + formatNumber(v, activeMetric === 'valor');
                                 }
                             }
                         }
@@ -824,8 +837,7 @@
                             grid: { borderDash: [2, 4] },
                             ticks: {
                                 callback: (val) => {
-                                    if(activeMetric === 'valor') return val.toLocaleString('pt-BR',{style:'currency',currency:'BRL', maximumFractionDigits: 0});
-                                    return val;
+                                    return formatNumber(val, activeMetric === 'valor');
                                 }
                             }
                         }, 
@@ -868,8 +880,23 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false }, datalabels: { display: false } },
-                    scales: { x: { grid: { display: false } } }
+                    plugins: { 
+                        legend: { display: false }, 
+                        datalabels: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => 'NFs: ' + formatNumber(ctx.raw)
+                            }
+                        }
+                    },
+                    scales: { 
+                        x: { grid: { display: false } },
+                        y: {
+                            ticks: {
+                                callback: (val) => formatNumber(val)
+                            }
+                        }
+                    }
                 }
             });
         }
@@ -902,7 +929,16 @@
                     cutout: '70%',
                     plugins: {
                         legend: { position: 'right' },
-                        datalabels: { color: '#fff', font: { weight: 'bold' } }
+                        datalabels: { 
+                            color: '#fff', 
+                            font: { weight: 'bold' },
+                            formatter: (val) => formatNumber(val)
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => ctx.label + ': ' + formatNumber(ctx.raw)
+                            }
+                        }
                     }
                 }
             });
@@ -925,18 +961,18 @@
             document.getElementById('tableTopCities').innerHTML = sortedCities.map(([k, v], i) => `
                 <tr class="hover:bg-gray-50 border-b border-gray-100 last:border-0">
                     <td class="px-4 py-2"><span class="text-xs font-bold text-gray-400 mr-2">#${i+1}</span> ${k}</td>
-                    <td class="px-4 py-2 text-center bg-gray-50 font-mono text-xs">${v.count}</td>
-                    <td class="px-4 py-2 text-center text-xs text-indigo-600 font-bold">${v.vol}</td>
-                    <td class="px-4 py-2 text-right font-bold text-gray-700">${v.val.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</td>
+                    <td class="px-4 py-2 text-center bg-gray-50 font-mono text-xs">${formatNumber(v.count)}</td>
+                    <td class="px-4 py-2 text-center text-xs text-indigo-600 font-bold">${formatNumber(v.vol)}</td>
+                    <td class="px-4 py-2 text-right font-bold text-gray-700">${formatNumber(v.val, true)}</td>
                 </tr>`).join('');
 
             const sortedClients = aggregate(d => d.cliente ? d.cliente.substring(0,30) : 'Indefinido');
             document.getElementById('tableTopClients').innerHTML = sortedClients.map(([k, v], i) => `
                 <tr class="hover:bg-gray-50 border-b border-gray-100 last:border-0">
                     <td class="px-4 py-2"><span class="text-xs font-bold text-gray-400 mr-2">#${i+1}</span> ${k}...</td>
-                    <td class="px-4 py-2 text-center bg-gray-50 font-mono text-xs">${v.count}</td>
-                    <td class="px-4 py-2 text-center text-xs text-indigo-600 font-bold">${v.vol}</td>
-                    <td class="px-4 py-2 text-right font-bold text-gray-700">${v.val.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</td>
+                    <td class="px-4 py-2 text-center bg-gray-50 font-mono text-xs">${formatNumber(v.count)}</td>
+                    <td class="px-4 py-2 text-center text-xs text-indigo-600 font-bold">${formatNumber(v.vol)}</td>
+                    <td class="px-4 py-2 text-right font-bold text-gray-700">${formatNumber(v.val, true)}</td>
                 </tr>`).join('');
         }
 
@@ -974,18 +1010,18 @@
                 const color = sla >= 95 ? 'text-green-600 bg-green-50' : (sla >= 80 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50');
                 html += `<tr class="hover:bg-gray-50 transition-colors border-b">
                     <td class="px-6 py-4 text-sm font-bold text-gray-800">${c.name}</td>
-                    <td class="px-6 py-4 text-center text-sm font-mono text-gray-600">${c.emit}</td>
-                    <td class="px-6 py-4 text-center text-sm font-bold text-green-600">${c.ent}</td>
-                    <td class="px-6 py-4 text-center text-sm font-bold text-yellow-600">${c.pen}</td>
-                    <td class="px-6 py-4 text-center text-sm text-blue-600">${c.ok}</td>
-                    <td class="px-6 py-4 text-center text-sm text-red-500">${c.nok}</td>
+                    <td class="px-6 py-4 text-center text-sm font-mono text-gray-600">${formatNumber(c.emit)}</td>
+                    <td class="px-6 py-4 text-center text-sm font-bold text-green-600">${formatNumber(c.ent)}</td>
+                    <td class="px-6 py-4 text-center text-sm font-bold text-yellow-600">${formatNumber(c.pen)}</td>
+                    <td class="px-6 py-4 text-center text-sm text-blue-600">${formatNumber(c.ok)}</td>
+                    <td class="px-6 py-4 text-center text-sm text-red-500">${formatNumber(c.nok)}</td>
                     <td class="px-6 py-4 text-center"><span class="px-2 py-1 rounded text-xs font-bold ${color}">${sla}%</span></td>
                 </tr>`;
             });
             
             tbody.innerHTML = html;
             const totalSla = t.ent > 0 ? ((t.ok/t.ent)*100).toFixed(1) : '0.0';
-            tfoot.innerHTML = `<tr class="bg-gray-100"><td class="px-6 py-4 font-extrabold text-gray-800">TOTAL GERAL</td><td class="px-6 py-4 text-center font-bold">${t.emit}</td><td class="px-6 py-4 text-center font-bold text-green-700">${t.ent}</td><td class="px-6 py-4 text-center font-bold text-yellow-700">${t.pen}</td><td class="px-6 py-4 text-center font-bold">${t.ok}</td><td class="px-6 py-4 text-center font-bold text-red-700">${t.nok}</td><td class="px-6 py-4 text-center font-extrabold text-blue-800">${totalSla}%</td></tr>`;
+            tfoot.innerHTML = `<tr class="bg-gray-100"><td class="px-6 py-4 font-extrabold text-gray-800">TOTAL GERAL</td><td class="px-6 py-4 text-center font-bold">${formatNumber(t.emit)}</td><td class="px-6 py-4 text-center font-bold text-green-700">${formatNumber(t.ent)}</td><td class="px-6 py-4 text-center font-bold text-yellow-700">${formatNumber(t.pen)}</td><td class="px-6 py-4 text-center font-bold">${formatNumber(t.ok)}</td><td class="px-6 py-4 text-center font-bold text-red-700">${formatNumber(t.nok)}</td><td class="px-6 py-4 text-center font-extrabold text-blue-800">${totalSla}%</td></tr>`;
         }
 
         // --- UPLOAD PROCESS ---
@@ -1205,7 +1241,7 @@
             const thead = document.getElementById('dataTableHeader'); const tbody = document.getElementById('dataTableBody');
             thead.innerHTML = `<tr><th class="px-2 py-1 bg-gray-100 sticky left-0 z-30 border-b w-10">#</th>${visibleColumns.map(c=>`<th class="px-2 py-3 text-left border-b font-bold text-gray-600 bg-gray-50 uppercase text-xs tracking-wider">${c.replace('_',' ')}</th>`).join('')}</tr>`;
             const start = (currentPage - 1) * rowsPerPage; const pageData = filteredData.slice(start, start + rowsPerPage);
-            tbody.innerHTML = pageData.map(r => `<tr class="hover:bg-blue-50 transition-colors border-b last:border-0"><td class="px-2 py-1 border-b sticky left-0 bg-white z-10 text-center"><button onclick="alert('Edição rápida desativada temporariamente')" class="text-gray-300 hover:text-fb-pink"><i class="fas fa-pen"></i></button></td>${visibleColumns.map(c => `<td class="px-2 py-2 text-gray-700 whitespace-nowrap text-xs">${(c.includes('valor')) && r[c]?r[c].toLocaleString('pt-BR',{style:'currency',currency:'BRL'}): (c.includes('data') || c==='emissao' && r[c]) ? new Date(r[c]).toLocaleDateString() : r[c]||''}</td>`).join('')}</tr>`).join('');
+            tbody.innerHTML = pageData.map(r => `<tr class="hover:bg-blue-50 transition-colors border-b last:border-0"><td class="px-2 py-1 border-b sticky left-0 bg-white z-10 text-center"><button onclick="alert('Edição rápida desativada temporariamente')" class="text-gray-300 hover:text-fb-pink"><i class="fas fa-pen"></i></button></td>${visibleColumns.map(c => `<td class="px-2 py-2 text-gray-700 whitespace-nowrap text-xs">${(c.includes('valor')) && r[c]?formatNumber(r[c], true): (c.includes('data') || c==='emissao' && r[c]) ? new Date(r[c]).toLocaleDateString() : r[c]||''}</td>`).join('')}</tr>`).join('');
             document.getElementById('paginationInfo').innerText = `Mostrando ${start+1}-${Math.min(start+rowsPerPage, filteredData.length)} de ${filteredData.length}`;
         }
     </script>
