@@ -21,7 +21,8 @@
                         fb: {
                             pink: '#e83e8c',
                             dark: '#1a1a1a',
-                            light: '#f8f9fa'
+                            light: '#f8f9fa',
+                            accent: '#ff6b6b'
                         }
                     },
                     fontSize: {
@@ -51,13 +52,14 @@
         .active-tab {
             background-color: #e83e8c;
             color: white;
+            border-left: 4px solid #ad1457;
         }
         
         .table-compact td, .table-compact th {
-            padding: 0.25rem 0.5rem;
+            padding: 0.35rem 0.75rem;
             white-space: nowrap;
             font-size: 0.75rem;
-            height: 32px;
+            height: 36px;
         }
         
         .table-compact th {
@@ -65,208 +67,465 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
             background-color: #f9fafb;
+            color: #6b7280;
+            font-weight: 700;
         }
 
         .custom-scrollbar::-webkit-scrollbar {
-            height: 10px;
-            width: 10px;
+            height: 8px;
+            width: 8px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
             background: #f1f1f1;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #c1c1c1;
-            border-radius: 5px;
-            border: 2px solid #f1f1f1;
+            border-radius: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
         }
 
-        .modal { transition: opacity 0.25s ease; }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+
+        .card-kpi {
+            transition: all 0.2s ease-in-out;
+        }
+        .card-kpi:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
     </style>
 </head>
-<body class="bg-gray-100 font-sans text-gray-800">
+<body class="bg-gray-100 font-sans text-gray-800 h-screen overflow-hidden">
 
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-[70] flex items-center justify-center hidden">
-        <div class="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center">
-            <div class="loader mb-4"></div>
-            <p id="loadingText" class="text-gray-700 font-semibold">Carregando...</p>
-        </div>
-    </div>
-
-    <!-- Process Modal -->
-    <div id="processModal" class="fixed inset-0 z-[80] hidden flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm" role="dialog" aria-modal="true">
-        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md transform transition-all scale-100">
-            <div class="flex justify-between items-center mb-4 border-b pb-3">
-                <h3 class="text-lg font-bold text-gray-800" id="processTitle">Confirmação de Importação</h3>
-                <button onclick="closeProcessModal()" id="btnCloseProcess" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
-            </div>
-            <div id="processConfirmContent">
-                <div class="flex items-start mb-4 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                    <i class="fas fa-exclamation-triangle text-yellow-500 text-xl mr-3 mt-1"></i>
-                    <p class="text-sm text-yellow-800"><strong>Atenção:</strong> Esta ação irá <span class="font-bold text-red-600">APAGAR TODOS</span> os dados antigos e substituí-los pelo novo arquivo.</p>
-                </div>
-                <div id="uploadStats" class="mb-4 text-center hidden">
-                    <p class="text-sm text-gray-600">Linhas encontradas no arquivo:</p>
-                    <p class="text-2xl font-bold text-fb-pink" id="linesFoundCount">0</p>
-                </div>
-                <div class="flex justify-end gap-3">
-                    <button onclick="closeProcessModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">Cancelar</button>
-                    <button onclick="startUploadProcess()" class="px-4 py-2 bg-fb-pink text-white rounded-lg hover:bg-pink-700 text-sm font-medium shadow-md flex items-center"><i class="fas fa-cloud-upload-alt mr-2"></i> Sim, Substituir</button>
-                </div>
-            </div>
-            <div id="processProgressContent" class="hidden text-center py-2">
-                <div class="loader mx-auto mb-4 h-12 w-12 border-4"></div>
-                <h4 class="text-gray-800 font-bold mb-1" id="progressStepTitle">Iniciando...</h4>
-                <p class="text-sm text-gray-500 mb-4" id="progressStepDetail">Preparando ambiente...</p>
-                <div class="w-full bg-gray-200 rounded-full h-3 mb-2 overflow-hidden"><div id="progressBar" class="bg-fb-pink h-3 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div></div>
-                <p class="text-xs text-right text-gray-400" id="progressPercent">0%</p>
-            </div>
-            <div id="processSuccessContent" class="hidden text-center py-4">
-                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500"><i class="fas fa-check text-3xl"></i></div>
-                <h4 class="text-xl font-bold text-gray-800 mb-2">Sucesso!</h4>
-                <p class="text-sm text-gray-600 mb-4" id="successMessage">Dados atualizados.</p>
-                <button onclick="finishProcess()" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow">Fechar e Atualizar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Modal -->
-    <div id="editModal" class="fixed inset-0 z-[60] hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeEditModal()"></div>
-            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Editar Registro</h3>
-                    <div class="mt-4 grid grid-cols-1 gap-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2" id="modalFormFields"></div>
-                </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button onclick="saveEditedRow()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-fb-pink text-base font-medium text-white hover:bg-pink-700 sm:ml-3 sm:w-auto sm:text-sm">Salvar</button>
-                    <button onclick="closeEditModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancelar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="flex h-screen overflow-hidden">
-        <!-- Sidebar -->
-        <aside class="w-64 bg-fb-dark text-white flex-shrink-0 hidden md:flex flex-col z-50">
-            <div class="p-6 border-b border-gray-700">
-                <h1 class="text-2xl font-bold text-fb-pink">Face Beautiful</h1>
-                <p class="text-xs text-gray-400 mt-1">Monitoramento Logístico</p>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="fixed inset-0 z-[100] bg-gray-900 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1570222094114-28a9d88a2b64?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80')] bg-cover bg-center">
+        <div class="absolute inset-0 bg-black bg-opacity-70"></div>
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md relative z-10 glass-effect">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-fb-pink mb-2">Face Beautiful</h1>
+                <p class="text-gray-600 text-sm">Portal de Monitoramento Logístico</p>
             </div>
             
-            <nav class="flex-1 overflow-y-auto py-4">
-                <ul>
-                    <li><a href="#" onclick="resetAndShowDashboard()" id="nav-dashboard" class="flex items-center px-6 py-3 hover:bg-gray-800 active-tab transition-colors"><i class="fas fa-chart-line w-6"></i><span>Visão Geral</span></a></li>
-                    <li><a href="#" onclick="showPage('summary')" id="nav-summary" class="flex items-center px-6 py-3 hover:bg-gray-800 transition-colors"><i class="fas fa-table w-6"></i><span>Painel Resumido (SLA)</span></a></li>
-                    <li class="px-6 py-2 text-xs uppercase text-gray-500 font-bold mt-4">Distribuição</li>
-                    <li><a href="#" onclick="filterDistribution('RJ')" class="flex items-center px-6 py-2 hover:bg-gray-800 transition-colors text-sm"><i class="fas fa-truck w-6"></i> <span>Rio de Janeiro (Real Med)</span></a></li>
-                    <li><a href="#" onclick="filterDistribution('RJ2')" class="flex items-center px-6 py-2 hover:bg-gray-800 transition-colors text-sm"><i class="fas fa-shuttle-van w-6"></i> <span>Rio de Janeiro 2 (Frota)</span></a></li>
-                    <li><a href="#" onclick="filterDistribution('SP')" class="flex items-center px-6 py-2 hover:bg-gray-800 transition-colors text-sm"><i class="fas fa-city w-6"></i> <span>São Paulo</span></a></li>
-                    <li><a href="#" onclick="filterDistribution('ES')" class="flex items-center px-6 py-2 hover:bg-gray-800 transition-colors text-sm"><i class="fas fa-map-marked-alt w-6"></i> <span>Espírito Santo</span></a></li>
-                    <li><a href="#" onclick="filterDistribution('HM7')" class="flex items-center px-6 py-2 hover:bg-gray-800 transition-colors text-sm"><i class="fas fa-sun w-6"></i> <span>BA / NE / MG (HM7)</span></a></li>
-                    <li class="px-6 py-2 text-xs uppercase text-gray-500 font-bold mt-4">Gestão</li>
-                    <li><a href="#" onclick="showPage('data')" id="nav-data" class="flex items-center px-6 py-3 hover:bg-gray-800 transition-colors"><i class="fas fa-database w-6"></i><span>Gerenciar Dados</span></a></li>
-                    <li><a href="#" onclick="showPage('upload')" id="nav-upload" class="flex items-center px-6 py-3 hover:bg-gray-800 transition-colors"><i class="fas fa-file-upload w-6"></i><span>Importar Arquivo</span></a></li>
+            <div id="loginError" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 text-sm" role="alert"></div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-6">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-fb-pink focus:border-fb-pink sm:text-sm">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Senha</label>
+                    <input type="password" id="password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-fb-pink focus:border-fb-pink sm:text-sm">
+                </div>
+                
+                <div class="flex items-center">
+                    <input id="rememberMe" type="checkbox" class="h-4 w-4 text-fb-pink focus:ring-fb-pink border-gray-300 rounded">
+                    <label for="rememberMe" class="ml-2 block text-sm text-gray-900">
+                        Permanecer conectado
+                    </label>
+                </div>
+
+                <div>
+                    <button type="submit" id="btnLogin" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-fb-pink hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-fb-pink transition-colors">
+                        Entrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- App Content (Hidden until login) -->
+    <div id="appContent" class="flex h-screen hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-fb-dark text-white flex-shrink-0 hidden md:flex flex-col z-50 shadow-xl">
+            <div class="p-6 border-b border-gray-700 flex flex-col items-center gap-4">
+                <!-- Logos -->
+                <div class="w-full flex justify-between gap-2">
+                    <div class="h-12 w-24 bg-white rounded flex items-center justify-center overflow-hidden">
+                        <span class="text-fb-pink font-bold text-xs text-center">FACE BEAUTIFUL</span> 
+                    </div>
+                    <div class="h-12 w-24 bg-white rounded flex items-center justify-center overflow-hidden">
+                        <i class="fas fa-truck text-gray-600 text-xl"></i>
+                    </div>
+                </div>
+                <div class="text-center mt-2">
+                    <p class="text-xs text-gray-400">Usuário Logado</p>
+                    <p class="text-sm font-bold text-white truncate w-48" id="userEmailDisplay">user@email.com</p>
+                </div>
+            </div>
+            
+            <nav class="flex-1 overflow-y-auto py-4 custom-scrollbar">
+                <ul class="space-y-1">
+                    <li><a href="#" onclick="showPage('dashboard')" id="nav-dashboard" class="flex items-center px-6 py-3 hover:bg-gray-800 active-tab transition-all"><i class="fas fa-chart-pie w-6"></i><span>Dashboard Geral</span></a></li>
+                    <li><a href="#" onclick="showPage('summary')" id="nav-summary" class="flex items-center px-6 py-3 hover:bg-gray-800 transition-all"><i class="fas fa-table w-6"></i><span>Painel SLA & Performance</span></a></li>
+                    
+                    <li class="px-6 py-2 text-xs uppercase text-gray-500 font-bold mt-4 tracking-wider">Administração</li>
+                    <li><a href="#" onclick="showPage('data')" id="nav-data" class="flex items-center px-6 py-3 hover:bg-gray-800 transition-all"><i class="fas fa-database w-6"></i><span>Base de Dados</span></a></li>
+                    <li><a href="#" onclick="showPage('upload')" id="nav-upload" class="flex items-center px-6 py-3 hover:bg-gray-800 transition-all"><i class="fas fa-file-upload w-6"></i><span>Importar Arquivo</span></a></li>
+                    <li><a href="#" onclick="handleLogout()" class="flex items-center px-6 py-3 hover:bg-red-900 text-red-400 transition-all mt-4 border-t border-gray-700"><i class="fas fa-sign-out-alt w-6"></i><span>Sair</span></a></li>
                 </ul>
             </nav>
-            <div class="p-4 border-t border-gray-700 text-xs text-gray-400 text-center">v2.8.0 (Ordem Cronológica)</div>
+            
+            <div class="p-4 border-t border-gray-700">
+                <button onclick="exportAllData()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                    <i class="fas fa-file-excel"></i> Exportar Tudo
+                </button>
+            </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 relative">
-            <header class="md:hidden bg-fb-dark text-white p-4 flex justify-between items-center sticky top-0 z-40">
+        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 relative custom-scrollbar">
+            <!-- Header Mobile -->
+            <header class="md:hidden bg-fb-dark text-white p-4 flex justify-between items-center sticky top-0 z-40 shadow-md">
                 <span class="font-bold text-fb-pink">Face Beautiful</span>
-                <button onclick="alert('Use desktop para melhor experiência')" class="text-white"><i class="fas fa-bars"></i></button>
+                <button onclick="alert('Funcionalidades completas disponíveis em Desktop')" class="text-white"><i class="fas fa-bars"></i></button>
             </header>
 
-            <div class="bg-white p-4 shadow-sm sticky top-0 z-30">
-                <div class="flex flex-wrap gap-4 items-center justify-between">
-                    <h2 id="pageTitle" class="text-xl font-bold text-gray-800">Dashboard Geral</h2>
-                    <div class="flex gap-2" id="filterContainer">
-                        <select id="filterYear" onchange="applyFilters()" class="border rounded px-3 py-1 text-sm bg-gray-50">
-                            <!-- ALTERAÇÃO: Default agora é ALL para mostrar dados de 2026/2025 sem esconder nada -->
-                            <option value="all" selected>Todos os Anos</option>
-                            <option value="2025">2025</option>
-                            <option value="2026">2026</option>
-                        </select>
-                        <select id="filterMonth" onchange="applyFilters()" class="border rounded px-3 py-1 text-sm bg-gray-50"><option value="all">Todos os Meses</option><option value="JANEIRO">Janeiro</option><option value="FEVEREIRO">Fevereiro</option><option value="MARÇO">Março</option><option value="ABRIL">Abril</option><option value="MAIO">Maio</option><option value="JUNHO">Junho</option><option value="JULHO">Julho</option><option value="AGOSTO">Agosto</option><option value="SETEMBRO">Setembro</option><option value="OUTUBRO">Outubro</option><option value="NOVEMBRO">Novembro</option><option value="DEZEMBRO">Dezembro</option></select>
+            <!-- Top Bar & Filters -->
+            <div class="bg-white px-6 py-4 shadow-sm sticky top-0 z-30 border-b border-gray-200">
+                <div class="flex flex-col xl:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h2 id="pageTitle" class="text-2xl font-bold text-gray-800">Visão Geral</h2>
+                        <p class="text-xs text-gray-500 mt-1" id="lastUpdateText">Atualizado em tempo real</p>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <!-- SELETOR DE DISTRIBUIÇÃO -->
+                        <div class="flex items-center bg-white border border-gray-300 rounded-lg shadow-sm px-3 py-2 hover:border-fb-pink transition-colors">
+                            <i class="fas fa-map-marker-alt text-fb-pink mr-3"></i>
+                            <select id="filterRegion" onchange="applyFilters()" class="bg-transparent text-sm font-bold text-gray-700 focus:outline-none cursor-pointer">
+                                <option value="all">Todas as Regiões</option>
+                                <option disabled>──────────</option>
+                                <option value="RJ">Rio de Janeiro (Real Med)</option>
+                                <option value="RJ2">Rio de Janeiro (Frota)</option>
+                                <option value="SP">São Paulo</option>
+                                <option value="ES">Espírito Santo</option>
+                                <option value="HM7">Nordeste / MG (HM7)</option>
+                            </select>
+                        </div>
+
+                        <!-- FILTROS DE DATA -->
+                        <div class="flex gap-3 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                            <div class="flex items-center gap-2">
+                                <i class="far fa-calendar-alt text-gray-400"></i>
+                                <select id="filterYear" onchange="applyFilters()" class="bg-transparent text-sm font-semibold focus:outline-none text-gray-700 cursor-pointer">
+                                    <option value="all" selected>Todos os Anos</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2026">2026</option>
+                                </select>
+                            </div>
+                            <div class="w-px bg-gray-300 h-6"></div>
+                            <div class="flex items-center gap-2">
+                                <select id="filterMonth" onchange="applyFilters()" class="bg-transparent text-sm font-semibold focus:outline-none text-gray-700 cursor-pointer">
+                                    <option value="all">Todos os Meses</option>
+                                    <option value="JANEIRO">Janeiro</option>
+                                    <option value="FEVEREIRO">Fevereiro</option>
+                                    <option value="MARÇO">Março</option>
+                                    <option value="ABRIL">Abril</option>
+                                    <option value="MAIO">Maio</option><option value="JUNHO">Junho</option><option value="JULHO">Julho</option><option value="AGOSTO">Agosto</option><option value="SETEMBRO">Setembro</option><option value="OUTUBRO">Outubro</option><option value="NOVEMBRO">Novembro</option><option value="DEZEMBRO">Dezembro</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="p-6">
-                <!-- Dashboard -->
-                <div id="page-dashboard" class="page-section">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                        <div class="bg-white rounded-lg shadow p-5 border-l-4 border-blue-500"><div><p class="text-sm text-gray-500 font-bold">Faturamento Total</p><h3 class="text-2xl font-bold text-gray-800" id="kpi-faturamento">R$ 0,00</h3></div></div>
-                        <div class="bg-white rounded-lg shadow p-5 border-l-4 border-green-500"><div><p class="text-sm text-gray-500 font-bold">Entregas Realizadas</p><h3 class="text-2xl font-bold text-gray-800" id="kpi-entregas">0</h3></div></div>
-                        <div class="bg-white rounded-lg shadow p-5 border-l-4 border-yellow-500"><div><p class="text-sm text-gray-500 font-bold">Pendentes</p><h3 class="text-2xl font-bold text-gray-800" id="kpi-pendentes">0</h3></div></div>
-                        <div class="bg-white rounded-lg shadow p-5 border-l-4 border-purple-500"><div><p class="text-sm text-gray-500 font-bold">Ticket Médio</p><h3 class="text-2xl font-bold text-gray-800" id="kpi-ticket">R$ 0,00</h3></div></div>
-                    </div>
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                        <div class="bg-white rounded-lg shadow p-5 col-span-2">
-                            <h3 class="font-bold text-gray-700 mb-4">Evolução Mensal (Entregues vs Pendentes)</h3>
-                            <canvas id="chartEvolution" height="150"></canvas>
-                            <div id="chartEvolutionWarning" class="text-xs text-red-500 mt-2 text-center font-semibold hidden"></div>
+            <div class="p-6 space-y-6">
+                
+                <!-- DASHBOARD PAGE -->
+                <div id="page-dashboard" class="page-section animate-fade-in">
+                    
+                    <!-- KPI Cards Row 1: Totals -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                        <!-- Faturamento -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-5 card-kpi relative overflow-hidden">
+                            <div class="absolute right-0 top-0 h-full w-1 bg-blue-500"></div>
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Faturamento Total</p>
+                                    <h3 class="text-2xl font-extrabold text-gray-800 tracking-tight" id="kpi-faturamento">R$ 0,00</h3>
+                                </div>
+                                <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500"><i class="fas fa-dollar-sign text-lg"></i></div>
+                            </div>
                         </div>
-                        <div class="bg-white rounded-lg shadow p-5"><h3 class="font-bold text-gray-700 mb-4">Status das Entregas</h3><div class="relative h-64"><canvas id="chartStatus"></canvas></div></div>
+
+                        <!-- Entregas Totais -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-5 card-kpi relative overflow-hidden">
+                            <div class="absolute right-0 top-0 h-full w-1 bg-green-500"></div>
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Entregas Totais</p>
+                                    <h3 class="text-2xl font-extrabold text-gray-800 tracking-tight" id="kpi-total-entregas">0</h3>
+                                    <p class="text-xxs text-gray-400 mt-1 font-medium">Notas Fiscais</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-500"><i class="fas fa-file-invoice text-lg"></i></div>
+                            </div>
+                        </div>
+
+                        <!-- Clientes -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-5 card-kpi relative overflow-hidden">
+                            <div class="absolute right-0 top-0 h-full w-1 bg-purple-500"></div>
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Clientes Atendidos</p>
+                                    <h3 class="text-2xl font-extrabold text-gray-800 tracking-tight" id="kpi-clientes">0</h3>
+                                </div>
+                                <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-500"><i class="fas fa-users text-lg"></i></div>
+                            </div>
+                        </div>
+
+                         <!-- Volumes -->
+                         <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-5 card-kpi relative overflow-hidden">
+                            <div class="absolute right-0 top-0 h-full w-1 bg-indigo-500"></div>
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Volumes Totais</p>
+                                    <h3 class="text-2xl font-extrabold text-gray-800 tracking-tight" id="kpi-volumes">0</h3>
+                                </div>
+                                <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500"><i class="fas fa-cubes text-lg"></i></div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                        <div class="bg-white rounded-lg shadow p-5"><h3 class="font-bold text-gray-700 mb-4">Top Cidades (Vendas)</h3><div class="overflow-y-auto h-80"><table class="min-w-full text-sm table-compact"><thead class="bg-gray-50 sticky top-0 z-10"><tr><th class="px-4 py-2 text-left">Cidade</th><th class="px-4 py-2 text-center">NFs</th><th class="px-4 py-2 text-right">Valor Total</th></tr></thead><tbody id="tableTopCities" class="divide-y divide-gray-100"></tbody></table></div></div>
-                        <div class="bg-white rounded-lg shadow p-5"><h3 class="font-bold text-gray-700 mb-4">Top Clientes</h3><div class="overflow-y-auto h-80"><table class="min-w-full text-sm table-compact"><thead class="bg-gray-50 sticky top-0 z-10"><tr><th class="px-4 py-2 text-left">Cliente</th><th class="px-4 py-2 text-center">NFs</th><th class="px-4 py-2 text-right">Valor Total</th></tr></thead><tbody id="tableTopClients" class="divide-y divide-gray-100"></tbody></table></div></div>
+
+                    <!-- KPI Cards Row 2: Operational Status -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                        <!-- Entregue -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center justify-between card-kpi">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center text-green-600 shadow-sm"><i class="fas fa-check-circle text-xl"></i></div>
+                                <div>
+                                    <p class="text-xxs text-gray-500 font-bold uppercase tracking-wider">Concluídas</p>
+                                    <h4 class="text-xl font-extrabold text-gray-800" id="kpi-entregues">0</h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Em Rota -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center justify-between card-kpi">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm"><i class="fas fa-truck-moving text-xl"></i></div>
+                                <div>
+                                    <p class="text-xxs text-gray-500 font-bold uppercase tracking-wider">Em Rota</p>
+                                    <h4 class="text-xl font-extrabold text-gray-800" id="kpi-em-rota">0</h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pendente Base -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center justify-between card-kpi">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center text-yellow-600 shadow-sm"><i class="fas fa-warehouse text-xl"></i></div>
+                                <div>
+                                    <p class="text-xxs text-gray-500 font-bold uppercase tracking-wider">Na Base / Aguard.</p>
+                                    <h4 class="text-xl font-extrabold text-gray-800" id="kpi-base">0</h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Devoluções/Problemas -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 flex items-center justify-between card-kpi">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center text-red-600 shadow-sm"><i class="fas fa-exclamation-triangle text-xl"></i></div>
+                                <div>
+                                    <p class="text-xxs text-gray-500 font-bold uppercase tracking-wider">Devoluções/Avarias</p>
+                                    <h4 class="text-xl font-extrabold text-gray-800" id="kpi-problemas">0</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Dynamic Chart -->
+                    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                            <h3 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                                <i class="fas fa-chart-bar text-fb-pink"></i> Evolução e Distribuição
+                            </h3>
+                            <div class="flex bg-gray-100 p-1 rounded-lg">
+                                <button onclick="updateDynamicChart('qtd')" id="btn-chart-qtd" class="px-4 py-1.5 text-xs font-bold rounded-md bg-white shadow text-fb-pink transition-all">Por Entregas</button>
+                                <button onclick="updateDynamicChart('valor')" id="btn-chart-valor" class="px-4 py-1.5 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700 transition-all">Por Valor (R$)</button>
+                                <button onclick="updateDynamicChart('volume')" id="btn-chart-volume" class="px-4 py-1.5 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700 transition-all">Por Volume</button>
+                            </div>
+                        </div>
+                        <div class="h-80 w-full relative">
+                            <canvas id="mainDynamicChart"></canvas>
+                        </div>
+                        <div id="chartWarning" class="text-center text-xs text-red-400 mt-2 hidden"></div>
+                    </div>
+
+                    <!-- Secondary Charts Row -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Daily Evolution -->
+                        <div class="bg-white rounded-xl shadow-sm p-6 col-span-2 border border-gray-100">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fas fa-chart-line text-gray-400"></i> Evolução Diária (Últimos 30 dias)</h3>
+                            <div class="h-64 relative">
+                                <canvas id="dailyChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- SLA & Status Distribution -->
+                        <div class="bg-white rounded-xl shadow-sm p-6 flex flex-col border border-gray-100">
+                            <h3 class="font-bold text-gray-800 mb-2 text-center">Performance de SLA</h3>
+                            <div class="flex-1 relative min-h-[200px]">
+                                <canvas id="slaChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tables Row -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Top Cidades -->
+                        <div class="bg-white rounded-xl shadow-sm p-0 flex flex-col h-[400px] border border-gray-100 overflow-hidden">
+                            <div class="p-4 border-b border-gray-100 bg-gray-50">
+                                <h3 class="font-bold text-gray-800 text-sm uppercase tracking-wide">Top Cidades (Volume)</h3>
+                            </div>
+                            <div class="overflow-y-auto flex-1 custom-scrollbar">
+                                <table class="min-w-full text-sm table-compact w-full">
+                                    <thead class="sticky top-0 z-10">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left w-1/2">Cidade</th>
+                                            <th class="px-4 py-2 text-center">NFs</th>
+                                            <th class="px-4 py-2 text-center">Vols</th>
+                                            <th class="px-4 py-2 text-right">Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tableTopCities" class="divide-y divide-gray-100"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Top Clientes -->
+                        <div class="bg-white rounded-xl shadow-sm p-0 flex flex-col h-[400px] border border-gray-100 overflow-hidden">
+                            <div class="p-4 border-b border-gray-100 bg-gray-50">
+                                <h3 class="font-bold text-gray-800 text-sm uppercase tracking-wide">Top Clientes</h3>
+                            </div>
+                            <div class="overflow-y-auto flex-1 custom-scrollbar">
+                                <table class="min-w-full text-sm table-compact w-full">
+                                    <thead class="sticky top-0 z-10">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left w-1/2">Cliente</th>
+                                            <th class="px-4 py-2 text-center">NFs</th>
+                                            <th class="px-4 py-2 text-center">Vols</th>
+                                            <th class="px-4 py-2 text-right">Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tableTopClients" class="divide-y divide-gray-100"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Painel Resumido -->
-                <div id="page-summary" class="page-section hidden">
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-gray-800">Painel de Performance e SLA</h3><button onclick="exportTableToCSV('summaryTable', 'painel_sla.csv')" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"><i class="fas fa-file-excel mr-1"></i> Exportar</button></div>
-                        <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200" id="summaryTable"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transportador / Região</th><th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Doc. Emitidos</th><th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Entregues</th><th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Pendentes</th><th class="px-6 py-3 text-center text-xs font-medium text-green-600 uppercase">No Prazo</th><th class="px-6 py-3 text-center text-xs font-medium text-red-600 uppercase">Fora do Prazo</th><th class="px-6 py-3 text-center text-xs font-medium text-blue-600 uppercase">% SLA</th></tr></thead><tbody class="bg-white divide-y divide-gray-200" id="slaTableBody"></tbody><tfoot class="bg-gray-100 font-bold" id="slaTableFoot"></tfoot></table></div>
+                <!-- OUTRAS PÁGINAS (MANTIDAS SIMILARES MAS COM ESTILO ATUALIZADO) -->
+                <div id="page-summary" class="page-section hidden animate-fade-in">
+                    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="font-bold text-xl text-gray-800">Painel Detalhado de SLA</h3>
+                            <button onclick="exportTableToCSV('summaryTable', 'sla_report.csv')" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-bold flex items-center shadow"><i class="fas fa-download mr-2"></i> CSV</button>
+                        </div>
+                        <div class="overflow-x-auto custom-scrollbar rounded-lg border">
+                            <table class="min-w-full divide-y divide-gray-200" id="summaryTable">
+                                <thead class="bg-gray-50"><tr><th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Região / Transportador</th><th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase">Total Emitido</th><th class="px-6 py-4 text-center text-xs font-bold text-green-600 uppercase">Entregues</th><th class="px-6 py-4 text-center text-xs font-bold text-yellow-600 uppercase">Pendentes</th><th class="px-6 py-4 text-center text-xs font-bold text-blue-600 uppercase">No Prazo</th><th class="px-6 py-4 text-center text-xs font-bold text-red-500 uppercase">Atrasado</th><th class="px-6 py-4 text-center text-xs font-bold text-gray-800 uppercase">% Eficiência</th></tr></thead>
+                                <tbody class="bg-white divide-y divide-gray-200" id="slaTableBody"></tbody>
+                                <tfoot class="bg-gray-100 font-bold" id="slaTableFoot"></tfoot>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Gerenciar Dados -->
-                <div id="page-data" class="page-section hidden">
-                    <div class="bg-white rounded-lg shadow p-4 md:p-6">
-                        <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
-                            <h3 class="font-bold text-lg text-gray-800">Gerenciamento de Dados</h3>
-                            <div class="flex gap-2 relative z-50">
-                                <button id="btnColumnSelector" onclick="toggleColumnMenu(event)" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded shadow-sm text-sm flex items-center font-medium"><i class="fas fa-columns mr-2 text-fb-pink"></i> Colunas</button>
-                                <div class="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-xl hidden flex flex-col max-h-[400px]" id="columnSelector">
-                                    <div class="p-3 bg-gray-50 border-b flex justify-between items-center"><span>Exibir Colunas</span><button onclick="toggleColumnMenu(event)"><i class="fas fa-times"></i></button></div>
+                <div id="page-data" class="page-section hidden animate-fade-in">
+                    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                         <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                            <h3 class="font-bold text-xl text-gray-800">Gerenciamento da Base de Dados</h3>
+                            <div class="flex gap-2 relative z-20">
+                                <button id="btnColumnSelector" onclick="toggleColumnMenu(event)" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg shadow-sm text-sm flex items-center font-bold transition-all"><i class="fas fa-columns mr-2 text-fb-pink"></i> Personalizar Colunas</button>
+                                <div class="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-2xl hidden flex flex-col max-h-[400px] z-50" id="columnSelector">
+                                    <div class="p-3 bg-gray-50 border-b flex justify-between items-center rounded-t-xl"><span class="font-bold text-gray-700">Colunas Visíveis</span><button onclick="toggleColumnMenu(event)"><i class="fas fa-times text-gray-400"></i></button></div>
                                     <div class="overflow-y-auto custom-scrollbar p-2 flex-1"><div class="text-xs font-bold text-fb-pink mb-2 uppercase px-1">Principais</div><div class="space-y-1" id="mainColumnsList"></div><div class="border-t my-2"></div><div class="text-xs font-bold text-gray-500 mb-2 uppercase px-1">Extras</div><div id="extraColumnsList" class="space-y-1"></div></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="overflow-x-auto custom-scrollbar border-t border-x rounded-t-lg bg-gray-50 relative z-0" id="topScrollContainer" onscroll="syncScroll('top')"><div style="height: 1px;" id="topScrollWidth"></div></div>
-                        <div class="overflow-x-auto custom-scrollbar border rounded-b-lg relative z-0 max-h-[600px]" id="dataTableContainer" onscroll="syncScroll('table')">
-                            <table class="min-w-full divide-y divide-gray-200 text-sm table-compact w-full relative" id="dataTable"><thead class="bg-gray-50 sticky top-0 z-30 shadow-sm" id="dataTableHeader"></thead><tbody class="bg-white divide-y divide-gray-200" id="dataTableBody"></tbody></table>
+                        <div class="overflow-x-auto custom-scrollbar border rounded-lg max-h-[600px] relative" id="dataTableContainer">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm table-compact w-full relative" id="dataTable">
+                                <thead class="bg-gray-50 sticky top-0 z-30 shadow-sm" id="dataTableHeader"></thead>
+                                <tbody class="bg-white divide-y divide-gray-200" id="dataTableBody"></tbody>
+                            </table>
                         </div>
-                        <div class="flex justify-between items-center mt-4 pt-4 border-t"><span class="text-xs md:text-sm text-gray-500" id="paginationInfo">Mostrando 0-0</span><div class="flex gap-1"><button onclick="changePage(-1)" class="px-3 py-1 border rounded hover:bg-gray-100"><i class="fas fa-chevron-left"></i></button><button onclick="changePage(1)" class="px-3 py-1 border rounded hover:bg-gray-100"><i class="fas fa-chevron-right"></i></button></div></div>
+                        <div class="flex justify-between items-center mt-4 pt-4 border-t">
+                            <span class="text-xs md:text-sm text-gray-500 font-medium" id="paginationInfo">Carregando...</span>
+                            <div class="flex gap-2">
+                                <button onclick="changePage(-1)" class="px-4 py-2 border rounded-lg hover:bg-gray-100 text-gray-600 disabled:opacity-50"><i class="fas fa-chevron-left"></i> Anterior</button>
+                                <button onclick="changePage(1)" class="px-4 py-2 border rounded-lg hover:bg-gray-100 text-gray-600 disabled:opacity-50">Próximo <i class="fas fa-chevron-right"></i></button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Upload -->
-                <div id="page-upload" class="page-section hidden">
-                    <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow text-center">
-                        <h2 class="text-2xl font-bold mb-6 text-gray-800">Atualização de Dados</h2>
-                        <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-700 text-left text-sm"><p>Instruções: Utilize o arquivo padrão. Os dados anteriores serão substituídos.</p></div>
-                        <label for="dropzone-file" class="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"><i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i><p class="text-sm text-gray-500">Clique ou arraste o arquivo</p><input id="dropzone-file" type="file" class="hidden" accept=".xlsx, .xls, .csv" onchange="handleFileSelect(event)" /></label>
-                        <div id="fileInfo" class="mt-4 hidden"><p class="font-bold text-gray-700" id="fileName"></p><button onclick="processAndUpload()" class="mt-4 bg-fb-pink hover:bg-pink-700 text-white font-bold py-2 px-6 rounded shadow">Processar e Salvar</button></div>
+                <div id="page-upload" class="page-section hidden animate-fade-in">
+                    <div class="max-w-3xl mx-auto bg-white p-10 rounded-xl shadow-sm text-center border border-gray-100">
+                        <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-500"><i class="fas fa-cloud-upload-alt text-4xl"></i></div>
+                        <h2 class="text-3xl font-bold mb-3 text-gray-800">Importação de Dados</h2>
+                        <p class="text-gray-500 mb-8">Arraste seu arquivo Excel (.xlsx) ou CSV para atualizar o sistema.</p>
+                        
+                        <label for="dropzone-file" class="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Clique para procurar</span> ou arraste e solte</p>
+                                <p class="text-xs text-gray-400">XLSX, XLS ou CSV (MAX. 20MB)</p>
+                            </div>
+                            <input id="dropzone-file" type="file" class="hidden" accept=".xlsx, .xls, .csv" onchange="handleFileSelect(event)" />
+                        </label>
+                        
+                        <div id="fileInfo" class="mt-6 hidden bg-green-50 p-4 rounded-lg border border-green-200 inline-block w-full">
+                            <div class="flex items-center justify-center gap-2 text-green-700 font-bold">
+                                <i class="fas fa-file-excel"></i> <span id="fileName">arquivo.xlsx</span>
+                            </div>
+                            <button onclick="processAndUpload()" class="mt-4 bg-fb-pink hover:bg-pink-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transform transition hover:-translate-y-1">
+                                Iniciar Processamento
+                            </button>
+                        </div>
                     </div>
                 </div>
+
             </div>
         </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-[90] flex items-center justify-center hidden backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center">
+            <div class="loader mb-4"></div>
+            <p id="loadingText" class="text-gray-700 font-bold">Processando...</p>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="fixed inset-0 z-[80] hidden overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" onclick="closeEditModal()"></div>
+            <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                    <div class="flex justify-between items-center mb-4 border-b pb-2">
+                        <h3 class="text-lg leading-6 font-bold text-gray-900">Editar Registro</h3>
+                        <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="mt-2 grid grid-cols-1 gap-y-4" id="modalFormFields"></div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-2">
+                    <button onclick="saveEditedRow()" class="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-fb-pink text-base font-medium text-white hover:bg-pink-700 sm:ml-3 sm:w-auto sm:text-sm">Salvar Alterações</button>
+                    <button onclick="closeEditModal()" class="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancelar</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, writeBatch, doc, query, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
         Chart.register(ChartDataLabels);
@@ -285,309 +544,98 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // State
         let rawData = [];
         let filteredData = [];
         let charts = {};
-        let currentDistributionFilter = null;
         let fileToUpload = null;
-        let fileDataToProcess = []; // Armazenar dados temporariamente
+        let fileDataToProcess = [];
         let currentPage = 1;
         const rowsPerPage = 50;
+        let activeMetric = 'qtd'; // MUDANÇA: Padrão agora é 'qtd' para "Por Entregas" (Notas)
         
-        // Colunas Padrão Atualizadas
-        let visibleColumns = ['nota_fiscal', 'cliente', 'cidade', 'uf', 'valor_nf', 'status_de_entrega', 'transportador', 'emissao', 'entrega_data']; 
+        let visibleColumns = ['nota_fiscal', 'emissao', 'cliente', 'cidade', 'uf', 'valor_nf', 'volumes', 'transportador', 'entrega_data', 'status_de_entrega']; 
         let allAvailableColumns = new Set();
         let editingDocId = null;
 
-        window.initApp = async () => {
-             document.getElementById('loadingOverlay').classList.remove('hidden');
-            try { await signInAnonymously(auth); await fetchData(); } catch (error) { alert("Erro ao conectar no Firebase: " + error.message); } finally { document.getElementById('loadingOverlay').classList.add('hidden'); }
+        // --- AUTH LOGIC ---
+        window.handleLogin = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('password').value;
+            const remember = document.getElementById('rememberMe').checked;
+            const errorDiv = document.getElementById('loginError');
+            
+            try {
+                await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (error) {
+                errorDiv.innerText = "Erro ao entrar: " + error.message;
+                errorDiv.classList.remove('hidden');
+            }
         };
 
+        window.handleLogout = async () => {
+            await signOut(auth);
+            window.location.reload();
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('appContent').classList.remove('hidden');
+                document.getElementById('userEmailDisplay').innerText = user.email;
+                fetchData();
+            } else {
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('appContent').classList.add('hidden');
+            }
+        });
+
+        // --- DATA LOGIC ---
         async function fetchData() {
-            document.getElementById('loadingText').innerText = "Baixando dados...";
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            document.getElementById('loadingText').innerText = "Sincronizando dados...";
             try {
                 const q = query(collection(db, "entregas")); 
                 const querySnapshot = await getDocs(q);
                 rawData = []; allAvailableColumns.clear();
-                const ignoredColumns = ['_id', 'mes', 'ano', 'sla', 'ocorrencia', 'status_detalhado', 'manifesto']; 
+                const ignoredColumns = ['_id', 'mes', 'ano', 'sla', 'ocorrencia', 'status_detalhado', 'manifesto', 'status_original']; 
 
                 querySnapshot.forEach((docSnap) => {
-                    const d = docSnap.data(); d._id = docSnap.id; rawData.push(d);
+                    const d = docSnap.data(); 
+                    d._id = docSnap.id; 
+                    // Proteção de Dados
+                    d.valor_nf = parseFloat(d.valor_nf || 0);
+                    d.volumes = parseInt(d.volumes || 1); 
+                    rawData.push(d);
+
                     Object.keys(d).forEach(k => {
-                        if(!k.startsWith('_') && !ignoredColumns.includes(k) && !visibleColumns.includes(k)) { allAvailableColumns.add(k); }
+                        if(!k.startsWith('_') && !ignoredColumns.includes(k) && !visibleColumns.includes(k)) { 
+                            allAvailableColumns.add(k); 
+                        }
                     });
                 });
-                applyFilters(); updateColumnSelector();
-            } catch (error) { console.error("Erro dados:", error); }
-        }
-
-        window.handleFileSelect = (event) => {
-            const file = event.target.files[0];
-            if (file) { document.getElementById('fileInfo').classList.remove('hidden'); document.getElementById('fileName').innerText = file.name; fileToUpload = file; }
-        };
-
-        window.processAndUpload = () => {
-            if (!fileToUpload) { alert("Selecione um arquivo."); return; }
-            document.getElementById('processModal').classList.remove('hidden');
-            document.getElementById('processConfirmContent').classList.add('hidden');
-            document.getElementById('processProgressContent').classList.add('hidden');
-            document.getElementById('processSuccessContent').classList.add('hidden');
-            document.getElementById('btnCloseProcess').classList.remove('hidden');
-            document.getElementById('uploadStats').classList.add('hidden');
-
-            // Ler o arquivo primeiro para contar linhas
-            const reader = new FileReader();
-            reader.readAsArrayBuffer(fileToUpload);
-            reader.onload = (e) => {
-                 try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" }); // defval garante que colunas vazias não quebrem a linha, mas aqui queremos contar linhas
-                    fileDataToProcess = jsonData;
-                    
-                    document.getElementById('linesFoundCount').innerText = fileDataToProcess.length;
-                    document.getElementById('uploadStats').classList.remove('hidden');
-                    document.getElementById('processConfirmContent').classList.remove('hidden');
-                 } catch(err) {
-                     alert("Erro ao ler arquivo: " + err.message);
-                     closeProcessModal();
-                 }
-            };
-        };
-
-        window.closeProcessModal = () => { document.getElementById('processModal').classList.add('hidden'); };
-        function updateProgress(title, detail, percent) { document.getElementById('progressStepTitle').innerText = title; document.getElementById('progressStepDetail').innerText = detail; document.getElementById('progressBar').style.width = percent + '%'; document.getElementById('progressPercent').innerText = percent + '%'; }
-
-        window.startUploadProcess = async () => {
-            document.getElementById('processConfirmContent').classList.add('hidden');
-            document.getElementById('processProgressContent').classList.remove('hidden');
-            document.getElementById('btnCloseProcess').classList.add('hidden');
-            updateProgress("Iniciando", "Conectando...", 5);
-
-            try {
-                // 1. Limpar
-                const colRef = collection(db, "entregas");
-                const q = query(colRef);
-                updateProgress("Limpando", "Removendo dados antigos...", 10);
-                const snapshot = await getDocs(q);
-                const deleteBatchSize = 400;
-                for (let i = 0; i < snapshot.docs.length; i += deleteBatchSize) {
-                    const batch = writeBatch(db);
-                    const chunk = snapshot.docs.slice(i, i + deleteBatchSize);
-                    chunk.forEach(doc => batch.delete(doc.ref));
-                    await batch.commit();
-                }
-
-                // 2. Processar Dados (já lidos anteriormente)
-                updateProgress("Processando", "Preparando dados...", 30);
                 
-                const processedData = fileDataToProcess.map(row => {
-                    const normalize = (str) => str ? str.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
-                    const getVal = (keys) => {
-                        for(let k of keys) {
-                            if(row[k] !== undefined) return row[k];
-                            for(let rk of Object.keys(row)) { if(normalize(rk) === normalize(k)) return row[rk]; }
-                        }
-                        return undefined;
-                    };
-
-                    // Mapeamento
-                    let nf = getVal(['NOTA FISCAL', 'NF', 'NFe']) || 'S/N';
-                    let clienteRaw = getVal(['CLIENTES', 'DESTINATARIO', 'CLIENTE']) || 'Consumidor';
-                    let dataEmissaoRaw = getVal(['EMISSÃO', 'DATA', 'EMISSAO']);
-                    let dataEntregaRaw = getVal(['ENTREGA DATA', 'DATA ENTREGA']);
-                    let valor = parseFloat(getVal(['VALOR NF', 'VALOR']) || 0);
-                    let estado = getVal(['UF', 'ESTADO']) || 'INDEFINIDO';
-                    let statusRaw = getVal(['STATUS DE ENTREGA', 'STATUS']) || 'PENDENTE';
-                    let statusSlaRaw = getVal(['STATUS DE SLA', 'STATUS SLA', 'SLA']);
-                    let transportadorVal = getVal(['TRANSPORTADOR', 'TRANSPORTADORA']);
-
-                    // Extração de Cidade Aprimorada
-                    let cidade = 'INDEFINIDO';
-                    let clienteNome = clienteRaw;
-
-                    if (typeof clienteRaw === 'string') {
-                        if (clienteRaw.includes(',')) {
-                            const parts = clienteRaw.split(',');
-                            const lastPart = parts[parts.length - 1].trim(); 
-                            if (lastPart.includes('-')) {
-                                const cityParts = lastPart.split('-');
-                                if (cityParts.length >= 2) {
-                                    cidade = cityParts[cityParts.length - 2].trim().toUpperCase();
-                                } else {
-                                    cidade = cityParts[0].trim().toUpperCase();
-                                }
-                            } else {
-                                cidade = lastPart.toUpperCase();
-                            }
-                            clienteNome = parts.slice(0, parts.length - 1).join(',').trim();
-                        } else if (clienteRaw.includes('-')) {
-                                const parts = clienteRaw.split('-');
-                                if (parts.length > 2) {
-                                    cidade = parts[parts.length - 2].trim().toUpperCase();
-                                    clienteNome = parts.slice(0, parts.length - 2).join('-').trim();
-                                }
-                        }
-                    }
-                    
-                    if (cidade === 'INDEFINIDO' || cidade.length < 3) {
-                        let c = getVal(['CIDADES', 'CIDADE']);
-                        if(c) cidade = c.toUpperCase();
-                    }
-
-                    // Datas
-                    let dataEmissao = parseExcelDate(dataEmissaoRaw);
-                    let dataEntrega = parseExcelDate(dataEntregaRaw);
-                    
-                    // Status
-                    let status = statusRaw.toString().toUpperCase();
-                    let simplifiedStatus = 'PENDENTE';
-                    if (status.includes('ENTREGUE')) simplifiedStatus = 'ENTREGUE';
-                    
-                    // SLA
-                    let slaStatus = 'NO PRAZO';
-                    if (statusSlaRaw && statusSlaRaw.toString().toUpperCase().includes('FORA')) slaStatus = 'FORA DO PRAZO';
-                    else if (status.includes('FORA DO PRAZO')) slaStatus = 'FORA DO PRAZO';
-
-                    // Distribuição
-                    let transportadorClass = 'OUTROS';
-                    const ufClean = estado.toString().trim().toUpperCase();
-                    const transClean = transportadorVal ? transportadorVal.toString().toUpperCase() : '';
-
-                    if (ufClean === 'SP') transportadorClass = 'DISTRIBUIÇÃO SP';
-                    else if (ufClean === 'ES') transportadorClass = 'DISTRIBUIÇÃO ES';
-                    else if (['BA','PE','PB','AL','SE','RN','CE','MA','PI','MG'].includes(ufClean)) transportadorClass = 'HM7';
-                    else if (ufClean === 'RJ') {
-                        // Verifica se "REALMED" aparece no nome do transportador, independente de case
-                        if (transClean.includes('REALMED') || transClean.includes('REAL MED')) {
-                            transportadorClass = 'REAL MED';
-                        } else {
-                            transportadorClass = 'DISTRIBUIÇÃO RJ 2';
-                        }
-                    }
-
-                    const newItem = {
-                        nota_fiscal: nf,
-                        cliente: clienteNome,
-                        cliente_full: clienteRaw,
-                        cidade: cidade,
-                        uf: ufClean,
-                        valor_nf: valor,
-                        transportador: transportadorClass,
-                        transportador_original: transportadorVal || '',
-                        emissao: dataEmissao ? dataEmissao.toISOString() : null,
-                        entrega_data: dataEntrega ? dataEntrega.toISOString() : null,
-                        status_de_entrega: simplifiedStatus,
-                        status_original: status,
-                        sla: slaStatus,
-                        mes: getMonthName(dataEmissao),
-                        ano: dataEmissao ? dataEmissao.getFullYear().toString() : '2026' // Fallback para 2026 dado o contexto
-                    };
-                    return newItem;
+                rawData.sort((a,b) => {
+                    const da = a.emissao ? new Date(a.emissao) : new Date(0);
+                    const db = b.emissao ? new Date(b.emissao) : new Date(0);
+                    return db - da;
                 });
 
-                // 3. Upload - IMPORTANTE: Usando ID Automático para evitar sobrescrever NFs duplicadas
-                updateProgress("Enviando", `Salvando ${processedData.length} registros...`, 50);
-                const batchSize = 400;
-                const totalItems = processedData.length;
-                let processedCount = 0;
-
-                for (let i = 0; i < totalItems; i += batchSize) {
-                    const batch = writeBatch(db);
-                    const chunk = processedData.slice(i, i + batchSize);
-                    chunk.forEach(item => {
-                        // Gera um ID novo para cada linha, garantindo que duplicatas de NF sejam salvas
-                        const newDocRef = doc(collection(db, "entregas")); 
-                        batch.set(newDocRef, item);
-                    });
-                    await batch.commit();
-                    processedCount += chunk.length;
-                    updateProgress("Enviando", `Salvando... (${Math.round((processedCount/totalItems)*100)}%)`, 50 + Math.round((processedCount/totalItems)*50));
-                }
-
-                // Forçar reset do filtro visual e atualizar UI
-                document.getElementById('filterYear').value = 'all';
-                document.getElementById('filterMonth').value = 'all';
-
-                document.getElementById('successMessage').innerText = `${processedCount} registros processados com sucesso.`;
-                document.getElementById('processProgressContent').classList.add('hidden');
-                document.getElementById('processSuccessContent').classList.remove('hidden');
-                document.getElementById('btnCloseProcess').classList.remove('hidden');
-
-            } catch (error) { alert("Erro DB: " + error.message); closeProcessModal(); }
-        };
-
-        window.finishProcess = async () => { closeProcessModal(); await fetchData(); resetAndShowDashboard(); };
-
-        // --- Helpers ---
-        function parseExcelDate(val) {
-            if (!val) return null;
-            let date;
-            if (typeof val === 'number') date = new Date(Math.round((val - 25569) * 86400 * 1000));
-            else {
-                const s = val.toString().trim();
-                // Tenta formato YYYY-MM-DD ou DD/MM/YYYY
-                if (s.match(/^\d{4}-\d{2}-\d{2}/)) { // ISO
-                    date = new Date(s);
-                } else if (s.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}/)) { // BR
-                    const p = s.split('/');
-                    const y = p[2].length === 2 ? '20'+p[2] : p[2];
-                    date = new Date(`${y}-${p[1]}-${p[0]}`);
-                } else if (s.includes('.')) { 
-                    const p = s.split('.'); 
-                    date = new Date(`${p[2]}-${p[1]}-${p[0]}`); 
-                } else {
-                    date = new Date(s);
-                }
-            }
-            return (date instanceof Date && !isNaN(date)) ? date : null;
-        }
-        function getMonthName(d) { if(!d) return 'INDEFINIDO'; return ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"][d.getMonth()]; }
-
-        // --- Interface ---
-        window.resetAndShowDashboard = () => {
-             currentDistributionFilter = null;
-             document.getElementById('pageTitle').innerText = "Dashboard Geral";
-             document.getElementById('filterYear').value = 'all'; // Reset visual
-             showPage('dashboard');
-             applyFilters();
-        };
-
-        window.showPage = (pageId) => {
-            document.querySelectorAll('.page-section').forEach(el => el.classList.add('hidden'));
-            document.getElementById(`page-${pageId}`).classList.remove('hidden');
-            document.querySelectorAll('nav a').forEach(el => el.classList.remove('active-tab'));
-            document.getElementById(`nav-${pageId}`).classList.add('active-tab');
-            
-            // Logica especifica da pagina
-            if(pageId === 'dashboard') { 
-                // Nao resetar filtro aqui, pois pode vir do filterDistribution
                 applyFilters(); 
-            }
-            else if(pageId === 'summary') { document.getElementById('pageTitle').innerText = "Painel Resumido"; renderSummaryTable(filteredData); }
-            else if(pageId === 'data') { document.getElementById('pageTitle').innerText = "Gerenciar Dados"; currentPage = 1; renderDataTable(); syncScroll('table'); }
-        };
+                updateColumnSelector();
+                updateDynamicChart(activeMetric); // Inicializa botões corretamente
+            } catch (error) { console.error("Erro dados:", error); alert("Erro ao baixar dados."); }
+            finally { document.getElementById('loadingOverlay').classList.add('hidden'); }
+        }
 
-        window.filterDistribution = (type) => {
-            currentDistributionFilter = type;
-            const titles = { 'RJ': 'Rio de Janeiro (Real Med)', 'RJ2': 'Rio de Janeiro 2 (Frota)', 'SP': 'São Paulo', 'ES': 'Espírito Santo', 'HM7': 'BA / NE / MG (HM7)' };
-            document.getElementById('pageTitle').innerText = titles[type] || "Dashboard";
-            
-            // Apenas muda visualmente para dashboard, sem resetar
-            document.querySelectorAll('.page-section').forEach(el => el.classList.add('hidden'));
-            document.getElementById(`page-dashboard`).classList.remove('hidden');
-            document.querySelectorAll('nav a').forEach(el => el.classList.remove('active-tab'));
-            
-            applyFilters();
-        };
-
+        // --- FILTER & UI LOGIC ---
         window.applyFilters = () => {
             const year = document.getElementById('filterYear').value;
             const month = document.getElementById('filterMonth').value;
+            const region = document.getElementById('filterRegion').value;
             
-            // Map keys
             const distMap = {
                 'RJ': 'REAL MED',
                 'RJ2': 'DISTRIBUIÇÃO RJ 2',
@@ -600,30 +648,259 @@
                 let passYear = (year === 'all') || (item.ano === year);
                 let passMonth = (month === 'all') || (item.mes === month);
                 let passDist = true;
-                if (currentDistributionFilter) {
-                    passDist = item.transportador === distMap[currentDistributionFilter];
+                
+                if (region !== 'all') {
+                    passDist = item.transportador === distMap[region];
                 }
+                
                 return passYear && passMonth && passDist;
             });
 
-            if (!document.getElementById('page-dashboard').classList.contains('hidden')) updateDashboardUI();
-            if (!document.getElementById('page-summary').classList.contains('hidden')) renderSummaryTable(filteredData);
-            if (!document.getElementById('page-data').classList.contains('hidden')) { currentPage = 1; renderDataTable(); }
+            if(region !== 'all') {
+                 const select = document.getElementById('filterRegion');
+                 const text = select.options[select.selectedIndex].text;
+                 document.getElementById('pageTitle').innerText = text;
+            } else {
+                 document.getElementById('pageTitle').innerText = "Visão Geral";
+            }
+
+            const current = document.querySelector('.page-section:not(.hidden)');
+            if (current && current.id === 'page-dashboard') updateDashboardUI();
+            if (current && current.id === 'page-summary') renderSummaryTable(filteredData);
+            if (current && current.id === 'page-data') { currentPage = 1; renderDataTable(); }
         };
 
+        window.showPage = (pageId) => {
+            document.querySelectorAll('.page-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`page-${pageId}`).classList.remove('hidden');
+            document.querySelectorAll('nav a').forEach(el => el.classList.remove('active-tab'));
+            document.getElementById(`nav-${pageId}`).classList.add('active-tab');
+            
+            if(pageId === 'dashboard') applyFilters(); 
+            else if(pageId === 'summary') { document.getElementById('pageTitle').innerText = "Painel SLA"; renderSummaryTable(filteredData); }
+            else if(pageId === 'data') { document.getElementById('pageTitle').innerText = "Base de Dados"; currentPage = 1; renderDataTable(); syncScroll('table'); }
+        };
+
+        // --- DASHBOARD UI ---
         function updateDashboardUI() {
-            const totalFat = filteredData.reduce((acc, curr) => acc + (curr.valor_nf || 0), 0);
-            const totalEntregues = filteredData.filter(d => d.status_de_entrega === 'ENTREGUE').length;
-            const totalPendentes = filteredData.filter(d => d.status_de_entrega === 'PENDENTE').length;
-            const ticket = filteredData.length > 0 ? (totalFat / filteredData.length) : 0; 
+            const totalFat = filteredData.reduce((acc, curr) => acc + curr.valor_nf, 0);
+            const totalDocs = filteredData.length;
+            const totalVols = filteredData.reduce((acc, curr) => acc + (curr.volumes || 1), 0);
+            const uniqueClients = new Set(filteredData.map(d => d.cliente)).size;
+
+            const entregues = filteredData.filter(d => d.status_de_entrega === 'ENTREGUE').length;
+            const problemas = filteredData.filter(d => d.status_de_entrega === 'DEVOLVIDO' || d.status_de_entrega.includes('AVARIA')).length;
             
+            let emRota = 0;
+            let naBase = 0;
+            
+            filteredData.forEach(d => {
+                if (d.status_de_entrega === 'PENDENTE') {
+                    const statusOrig = (d.status_original || '').toUpperCase();
+                    if (statusOrig.includes('ROTA') || statusOrig.includes('TRANSITO') || statusOrig.includes('SAIU')) {
+                        emRota++;
+                    } else {
+                        naBase++;
+                    }
+                }
+            });
+
             document.getElementById('kpi-faturamento').innerText = totalFat.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            document.getElementById('kpi-entregas').innerText = totalEntregues;
-            document.getElementById('kpi-pendentes').innerText = totalPendentes;
-            document.getElementById('kpi-ticket').innerText = ticket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            document.getElementById('kpi-total-entregas').innerText = totalDocs;
+            document.getElementById('kpi-clientes').innerText = uniqueClients;
+            document.getElementById('kpi-volumes').innerText = totalVols;
             
-            renderCharts(); 
+            document.getElementById('kpi-entregues').innerText = entregues;
+            document.getElementById('kpi-em-rota').innerText = emRota;
+            document.getElementById('kpi-base').innerText = naBase;
+            document.getElementById('kpi-problemas').innerText = problemas;
+
+            renderAllCharts();
             renderTopTables();
+        }
+
+        // --- CHARTS ---
+        window.updateDynamicChart = (metric) => {
+            activeMetric = metric;
+            // Style buttons
+            ['qtd', 'valor', 'volume'].forEach(m => {
+                const btn = document.getElementById(`btn-chart-${m}`);
+                if(m === metric) {
+                    btn.classList.add('bg-white', 'shadow', 'text-fb-pink');
+                    btn.classList.remove('text-gray-500');
+                } else {
+                    btn.classList.remove('bg-white', 'shadow', 'text-fb-pink');
+                    btn.classList.add('text-gray-500');
+                }
+            });
+            renderMainDynamicChart();
+        };
+
+        function renderAllCharts() {
+            renderMainDynamicChart();
+            renderDailyChart();
+            renderSLAChart();
+        }
+
+        function renderMainDynamicChart() {
+            const ctx = document.getElementById('mainDynamicChart');
+            const monthMap = { "JANEIRO": 0, "FEVEREIRO": 1, "MARÇO": 2, "ABRIL": 3, "MAIO": 4, "JUNHO": 5, "JULHO": 6, "AGOSTO": 7, "SETEMBRO": 8, "OUTUBRO": 9, "NOVEMBRO": 10, "DEZEMBRO": 11 };
+            const shortMonth = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
+            
+            const grouped = {};
+            filteredData.forEach(d => {
+                if(!d.mes || !d.ano || d.mes === 'INDEFINIDO') return;
+                const key = `${d.ano}-${monthMap[d.mes]}`;
+                if(!grouped[key]) grouped[key] = { label: `${shortMonth[monthMap[d.mes]]}/${d.ano.substring(2)}`, ent: 0, pen: 0 };
+                
+                let val = 0;
+                if(activeMetric === 'valor') val = d.valor_nf;
+                else if(activeMetric === 'volume') val = d.volumes || 1;
+                else val = 1;
+
+                if(d.status_de_entrega === 'ENTREGUE') grouped[key].ent += val;
+                else grouped[key].pen += val;
+            });
+
+            const keys = Object.keys(grouped).sort((a,b) => {
+                const [ya, ma] = a.split('-').map(Number);
+                const [yb, mb] = b.split('-').map(Number);
+                return ya - yb || ma - mb;
+            });
+
+            const labels = keys.map(k => grouped[k].label);
+            const dEnt = keys.map(k => grouped[k].ent);
+            const dPen = keys.map(k => grouped[k].pen);
+
+            if(charts.main) charts.main.destroy();
+            charts.main = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Realizado', data: dEnt, backgroundColor: '#10B981', borderRadius: 4 },
+                        { label: 'Pendente', data: dPen, backgroundColor: '#F59E0B', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        datalabels: { 
+                            anchor: 'end', 
+                            align: 'top', 
+                            formatter: (val) => {
+                                // CORREÇÃO DE FORMATAÇÃO
+                                if (activeMetric === 'valor') {
+                                    if(val > 1000000) return (val/1000000).toFixed(1) + 'M';
+                                    if(val > 1000) return (val/1000).toFixed(1) + 'k';
+                                    return val;
+                                }
+                                return val;
+                            },
+                            font: { size: 10, weight: 'bold' }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    let v = ctx.raw;
+                                    let label = ctx.dataset.label || '';
+                                    if(activeMetric === 'valor') {
+                                        return label + ': ' + v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+                                    }
+                                    return label + ': ' + v;
+                                }
+                            }
+                        }
+                    },
+                    scales: { 
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { borderDash: [2, 4] },
+                            ticks: {
+                                callback: (val) => {
+                                    if(activeMetric === 'valor') return val.toLocaleString('pt-BR',{style:'currency',currency:'BRL', maximumFractionDigits: 0});
+                                    return val;
+                                }
+                            }
+                        }, 
+                        x: { grid: { display: false } } 
+                    }
+                }
+            });
+        }
+
+        function renderDailyChart() {
+            const ctx = document.getElementById('dailyChart');
+            const daily = {};
+            
+            filteredData.forEach(d => {
+                if(!d.entrega_data && !d.emissao) return;
+                let dateKey = d.emissao ? d.emissao.split('T')[0] : null;
+                if(!dateKey) return;
+
+                if(!daily[dateKey]) daily[dateKey] = 0;
+                daily[dateKey]++;
+            });
+
+            const sortedDates = Object.keys(daily).sort().slice(-30);
+            
+            if(charts.daily) charts.daily.destroy();
+            charts.daily = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sortedDates.map(d => { const p = d.split('-'); return `${p[2]}/${p[1]}`; }),
+                    datasets: [{
+                        label: 'Volume de Notas Diário',
+                        data: sortedDates.map(d => daily[d]),
+                        borderColor: '#e83e8c',
+                        backgroundColor: 'rgba(232, 62, 140, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, datalabels: { display: false } },
+                    scales: { x: { grid: { display: false } } }
+                }
+            });
+        }
+
+        function renderSLAChart() {
+            const ctx = document.getElementById('slaChart');
+            let noPrazo = 0, foraPrazo = 0;
+            
+            filteredData.forEach(d => {
+                if(d.status_de_entrega === 'ENTREGUE') {
+                    if(d.sla === 'NO PRAZO') noPrazo++;
+                    else foraPrazo++;
+                }
+            });
+
+            if(charts.sla) charts.sla.destroy();
+            charts.sla = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['No Prazo', 'Atrasado'],
+                    datasets: [{
+                        data: [noPrazo, foraPrazo],
+                        backgroundColor: ['#3B82F6', '#EF4444'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { position: 'right' },
+                        datalabels: { color: '#fff', font: { weight: 'bold' } }
+                    }
+                }
+            });
         }
 
         function renderTopTables() {
@@ -631,28 +908,43 @@
                 const map = {};
                 filteredData.forEach(d => {
                     const k = keyFunc(d); if (!k || k === 'INDEFINIDO') return;
-                    if (!map[k]) map[k] = { val: 0, count: 0 };
-                    map[k].val += (d.valor_nf || 0); map[k].count += 1;
+                    if (!map[k]) map[k] = { val: 0, count: 0, vol: 0 };
+                    map[k].val += d.valor_nf; 
+                    map[k].count += 1;
+                    map[k].vol += d.volumes || 1;
                 });
-                return Object.entries(map).sort((a, b) => b[1].val - a[1].val).slice(0, 10);
+                return Object.entries(map).sort((a, b) => b[1].val - a[1].val).slice(0, 20);
             };
+            
             const sortedCities = aggregate(d => d.cidade);
-            document.getElementById('tableTopCities').innerHTML = sortedCities.map(([k, v]) => `<tr><td class="px-4 py-2 border-b">${k}</td><td class="px-4 py-2 text-center border-b">${v.count}</td><td class="px-4 py-2 text-right border-b font-bold">${v.val.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</td></tr>`).join('');
-            const sortedClients = aggregate(d => d.cliente ? d.cliente.substring(0,25) : 'Indefinido');
-            document.getElementById('tableTopClients').innerHTML = sortedClients.map(([k, v]) => `<tr><td class="px-4 py-2 border-b">${k}...</td><td class="px-4 py-2 text-center border-b">${v.count}</td><td class="px-4 py-2 text-right border-b font-bold">${v.val.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</td></tr>`).join('');
+            document.getElementById('tableTopCities').innerHTML = sortedCities.map(([k, v], i) => `
+                <tr class="hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                    <td class="px-4 py-2"><span class="text-xs font-bold text-gray-400 mr-2">#${i+1}</span> ${k}</td>
+                    <td class="px-4 py-2 text-center bg-gray-50 font-mono text-xs">${v.count}</td>
+                    <td class="px-4 py-2 text-center text-xs text-indigo-600 font-bold">${v.vol}</td>
+                    <td class="px-4 py-2 text-right font-bold text-gray-700">${v.val.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</td>
+                </tr>`).join('');
+
+            const sortedClients = aggregate(d => d.cliente ? d.cliente.substring(0,30) : 'Indefinido');
+            document.getElementById('tableTopClients').innerHTML = sortedClients.map(([k, v], i) => `
+                <tr class="hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                    <td class="px-4 py-2"><span class="text-xs font-bold text-gray-400 mr-2">#${i+1}</span> ${k}...</td>
+                    <td class="px-4 py-2 text-center bg-gray-50 font-mono text-xs">${v.count}</td>
+                    <td class="px-4 py-2 text-center text-xs text-indigo-600 font-bold">${v.vol}</td>
+                    <td class="px-4 py-2 text-right font-bold text-gray-700">${v.val.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</td>
+                </tr>`).join('');
         }
 
         function renderSummaryTable(data) {
-            const tableBody = document.getElementById('slaTableBody');
-            const tableFoot = document.getElementById('slaTableFoot');
+            const tbody = document.getElementById('slaTableBody');
+            const tfoot = document.getElementById('slaTableFoot');
             
-            // Inicializar fixo com todos
             const cats = {
                 'REAL MED': { name: 'Rio de Janeiro (Real Med)', emit:0, ent:0, pen:0, ok:0, nok:0 },
                 'DISTRIBUIÇÃO RJ 2': { name: 'Rio de Janeiro 2 (Frota)', emit:0, ent:0, pen:0, ok:0, nok:0 },
                 'DISTRIBUIÇÃO SP': { name: 'São Paulo', emit:0, ent:0, pen:0, ok:0, nok:0 },
                 'DISTRIBUIÇÃO ES': { name: 'Espírito Santo', emit:0, ent:0, pen:0, ok:0, nok:0 },
-                'HM7': { name: 'Bahia / NE / MG (HM7)', emit:0, ent:0, pen:0, ok:0, nok:0 }
+                'HM7': { name: 'Nordeste / MG (HM7)', emit:0, ent:0, pen:0, ok:0, nok:0 }
             };
 
             data.forEach(d => {
@@ -674,90 +966,228 @@
             Object.values(cats).forEach(c => {
                 t.emit+=c.emit; t.ent+=c.ent; t.pen+=c.pen; t.ok+=c.ok; t.nok+=c.nok;
                 const sla = c.ent > 0 ? ((c.ok/c.ent)*100).toFixed(1) : '0.0';
-                const color = sla >= 95 ? 'text-green-600' : (sla >= 80 ? 'text-yellow-600' : 'text-red-600');
-                html += `<tr><td class="px-6 py-4 text-sm font-medium text-gray-900">${c.name}</td><td class="px-6 py-4 text-center text-sm text-gray-500">${c.emit}</td><td class="px-6 py-4 text-center text-sm text-gray-500">${c.ent}</td><td class="px-6 py-4 text-center text-sm font-bold text-yellow-600 bg-yellow-50">${c.pen}</td><td class="px-6 py-4 text-center text-sm text-green-600">${c.ok}</td><td class="px-6 py-4 text-center text-sm text-red-600">${c.nok}</td><td class="px-6 py-4 text-center text-sm ${color}">${sla}%</td></tr>`;
+                const color = sla >= 95 ? 'text-green-600 bg-green-50' : (sla >= 80 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50');
+                html += `<tr class="hover:bg-gray-50 transition-colors border-b">
+                    <td class="px-6 py-4 text-sm font-bold text-gray-800">${c.name}</td>
+                    <td class="px-6 py-4 text-center text-sm font-mono text-gray-600">${c.emit}</td>
+                    <td class="px-6 py-4 text-center text-sm font-bold text-green-600">${c.ent}</td>
+                    <td class="px-6 py-4 text-center text-sm font-bold text-yellow-600">${c.pen}</td>
+                    <td class="px-6 py-4 text-center text-sm text-blue-600">${c.ok}</td>
+                    <td class="px-6 py-4 text-center text-sm text-red-500">${c.nok}</td>
+                    <td class="px-6 py-4 text-center"><span class="px-2 py-1 rounded text-xs font-bold ${color}">${sla}%</span></td>
+                </tr>`;
             });
             
-            tableBody.innerHTML = html;
+            tbody.innerHTML = html;
             const totalSla = t.ent > 0 ? ((t.ok/t.ent)*100).toFixed(1) : '0.0';
-            tableFoot.innerHTML = `<tr><td class="px-6 py-3 text-left">TOTAL GERAL</td><td class="px-6 py-3 text-center">${t.emit}</td><td class="px-6 py-3 text-center">${t.ent}</td><td class="px-6 py-3 text-center">${t.pen}</td><td class="px-6 py-3 text-center">${t.ok}</td><td class="px-6 py-3 text-center">${t.nok}</td><td class="px-6 py-3 text-center">${totalSla}%</td></tr>`;
+            tfoot.innerHTML = `<tr class="bg-gray-100"><td class="px-6 py-4 font-extrabold text-gray-800">TOTAL GERAL</td><td class="px-6 py-4 text-center font-bold">${t.emit}</td><td class="px-6 py-4 text-center font-bold text-green-700">${t.ent}</td><td class="px-6 py-4 text-center font-bold text-yellow-700">${t.pen}</td><td class="px-6 py-4 text-center font-bold">${t.ok}</td><td class="px-6 py-4 text-center font-bold text-red-700">${t.nok}</td><td class="px-6 py-4 text-center font-extrabold text-blue-800">${totalSla}%</td></tr>`;
         }
 
-        // --- Gráficos, Data Grid, Export --- (Funções auxiliares padrão mantidas e otimizadas)
-        function renderCharts() {
-            const sc = { 'ENTREGUE': 0, 'PENDENTE': 0, 'DEVOLVIDO': 0 }; filteredData.forEach(d => { if(sc[d.status_de_entrega] !== undefined) sc[d.status_de_entrega]++; });
-            if(charts.status) charts.status.destroy(); charts.status = new Chart(document.getElementById('chartStatus'), { type: 'doughnut', data: { labels: Object.keys(sc), datasets: [{ data: Object.values(sc), backgroundColor: ['#10B981', '#F59E0B', '#EF4444'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { datalabels: { color: '#fff' } } } });
-            
-            const monthMap = { "JANEIRO": 0, "FEVEREIRO": 1, "MARÇO": 2, "ABRIL": 3, "MAIO": 4, "JUNHO": 5, "JULHO": 6, "AGOSTO": 7, "SETEMBRO": 8, "OUTUBRO": 9, "NOVEMBRO": 10, "DEZEMBRO": 11 };
-            const shortMonth = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
-            
-            const timelineData = {};
-            let undefinedCount = 0;
-
-            filteredData.forEach(d => { 
-                if (!d.mes || d.mes === 'INDEFINIDO' || !d.ano) {
-                    undefinedCount++;
-                    return;
-                }
-                
-                const key = `${d.ano}-${monthMap[d.mes]}`; // Chave ordenavel: "2025-11" (Dezembro 2025)
-                
-                if (!timelineData[key]) {
-                    timelineData[key] = { 
-                        ano: parseInt(d.ano),
-                        mesIdx: monthMap[d.mes],
-                        label: `${shortMonth[monthMap[d.mes]]}/${d.ano.substring(2)}`,
-                        entregues: 0, 
-                        pendentes: 0 
-                    };
-                }
-                
-                if (d.status_de_entrega === 'ENTREGUE') timelineData[key].entregues++;
-                if (d.status_de_entrega === 'PENDENTE') timelineData[key].pendentes++;
-            });
-
-            // Ordenar chaves cronologicamente
-            const sortedKeys = Object.keys(timelineData).sort((a, b) => {
-                const [anoA, mesA] = a.split('-').map(Number);
-                const [anoB, mesB] = b.split('-').map(Number);
-                if (anoA !== anoB) return anoA - anoB;
-                return mesA - mesB;
-            });
-
-            // Aviso de Indefinidos
-            const warningEl = document.getElementById('chartEvolutionWarning');
-            if (undefinedCount > 0) {
-                warningEl.innerText = `* ${undefinedCount} registros com data indefinida não exibidos no gráfico.`;
-                warningEl.classList.remove('hidden');
-            } else {
-                warningEl.classList.add('hidden');
+        // --- UPLOAD PROCESS ---
+        window.handleFileSelect = (event) => {
+            const file = event.target.files[0];
+            if (file) { 
+                document.getElementById('fileInfo').classList.remove('hidden'); 
+                document.getElementById('fileName').innerText = file.name; 
+                fileToUpload = file; 
             }
+        };
 
-            const labels = sortedKeys.map(k => timelineData[k].label);
-            const dataEnt = sortedKeys.map(k => timelineData[k].entregues);
-            const dataPen = sortedKeys.map(k => timelineData[k].pendentes);
+        window.processAndUpload = () => {
+            if (!fileToUpload) return;
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            document.getElementById('loadingText').innerText = "Lendo arquivo...";
+            
+            const reader = new FileReader();
+            reader.readAsArrayBuffer(fileToUpload);
+            reader.onload = (e) => {
+                 try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                    uploadToFirebase(jsonData);
+                 } catch(err) {
+                     alert("Erro arquivo: " + err.message);
+                     document.getElementById('loadingOverlay').classList.add('hidden');
+                 }
+            };
+        };
 
-            if(charts.evo) charts.evo.destroy(); 
-            charts.evo = new Chart(document.getElementById('chartEvolution'), { 
-                type: 'bar', 
-                data: { 
-                    labels: labels, 
-                    datasets: [
-                        { label: 'Entregues', data: dataEnt, backgroundColor: '#10B981' }, 
-                        { label: 'Pendentes', data: dataPen, backgroundColor: '#F59E0B' }
-                    ] 
-                }, 
-                options: { 
-                    responsive: true, 
-                    plugins: { datalabels: { anchor: 'end', align: 'end' } } 
-                } 
-            });
+        async function uploadToFirebase(jsonData) {
+            document.getElementById('loadingText').innerText = "Processando dados...";
+            
+            try {
+                // Delete old
+                const q = query(collection(db, "entregas"));
+                const snapshot = await getDocs(q);
+                const deleteBatchSize = 400;
+                for (let i = 0; i < snapshot.docs.length; i += deleteBatchSize) {
+                    const batch = writeBatch(db);
+                    snapshot.docs.slice(i, i + deleteBatchSize).forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                }
+
+                // Process New
+                const processed = jsonData.map(row => {
+                    const getVal = (keys) => {
+                        const normalize = (str) => str ? str.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+                        for(let k of keys) {
+                            if(row[k] !== undefined) return row[k];
+                            for(let rk of Object.keys(row)) { 
+                                if(normalize(rk) === normalize(k)) return row[rk]; 
+                                if(rk.toUpperCase() === k.toUpperCase()) return row[rk];
+                                if(rk.toUpperCase().replace('_', ' ') === k.toUpperCase().replace('_', ' ')) return row[rk];
+                            }
+                        }
+                        return undefined;
+                    };
+
+                    let nf = getVal(['NOTA FISCAL', 'NF', 'NFe']) || 'S/N';
+                    let clienteRaw = getVal(['CLIENTES', 'DESTINATARIO', 'CLIENTE']) || 'Consumidor';
+                    let dataEmissaoRaw = getVal(['EMISSÃO', 'DATA', 'EMISSAO']);
+                    let dataEntregaRaw = getVal(['ENTREGA DATA', 'DATA ENTREGA']);
+                    let vNfRaw = getVal(['VALOR NF', 'VALOR']);
+                    let valor = (vNfRaw === "" || vNfRaw === undefined) ? 0 : parseFloat(vNfRaw);
+                    
+                    let estado = getVal(['UF', 'ESTADO']) || 'INDEFINIDO';
+                    let statusRaw = getVal(['STATUS DE ENTREGA', 'STATUS', 'STATUS DE_ENTREGA', 'STATUS_DE_ENTREGA']) || 'PENDENTE';
+                    let statusSlaRaw = getVal(['STATUS DE SLA', 'STATUS SLA', 'SLA']);
+                    let transportadorVal = getVal(['TRANSPORTADOR', 'TRANSPORTADORA']);
+                    
+                    let vVolRaw = getVal(['VOLUMES', 'VOLUME', 'QTD', 'QUANTIDADE']);
+                    let volumes = (vVolRaw === "" || vVolRaw === undefined) ? 1 : parseInt(vVolRaw);
+
+                    let cidade = 'INDEFINIDO';
+                    let clienteNome = clienteRaw;
+                    if (typeof clienteRaw === 'string') {
+                        if (clienteRaw.includes(',')) {
+                            const p = clienteRaw.split(',');
+                            const last = p[p.length-1].trim();
+                            if(last.includes('-')) {
+                                const cp = last.split('-');
+                                cidade = cp.length>=2 ? cp[cp.length-2].trim().toUpperCase() : cp[0].trim().toUpperCase();
+                            } else cidade = last.toUpperCase();
+                            clienteNome = p.slice(0, p.length-1).join(',').trim();
+                        } else if (clienteRaw.includes('-')) {
+                            const p = clienteRaw.split('-');
+                            if(p.length>2) { cidade = p[p.length-2].trim().toUpperCase(); clienteNome = p.slice(0, p.length-2).join('-').trim(); }
+                        }
+                    }
+                    if(cidade === 'INDEFINIDO' && getVal(['CIDADE'])) cidade = getVal(['CIDADE']).toUpperCase();
+
+                    const parseExcelDate = (serial) => {
+                       if (!serial) return null;
+                       if (typeof serial === 'number') {
+                           return new Date(Math.round((serial - 25569) * 86400 * 1000));
+                       }
+                       if (!isNaN(serial) && !serial.toString().includes('/')) {
+                           return new Date(Math.round((parseFloat(serial) - 25569) * 86400 * 1000));
+                       }
+                       const parts = serial.toString().split(/[-/.]/);
+                       if(parts.length===3) {
+                           return new Date(parts[2].length===2?'20'+parts[2]:parts[2], parts[1]-1, parts[0]);
+                       }
+                       return null;
+                    };
+
+                    let dEmissao = parseExcelDate(dataEmissaoRaw);
+                    let dEntrega = parseExcelDate(dataEntregaRaw);
+
+                    let status = statusRaw.toString().toUpperCase();
+                    let simplifiedStatus = 'PENDENTE';
+                    if (status.includes('ENTREGUE')) simplifiedStatus = 'ENTREGUE';
+                    else if (status.includes('DEVOL') || status.includes('AVARIA')) simplifiedStatus = 'DEVOLVIDO';
+                    
+                    let slaStatus = 'NO PRAZO';
+                    if ((statusSlaRaw && statusSlaRaw.toString().toUpperCase().includes('FORA')) || status.includes('FORA DO PRAZO')) slaStatus = 'FORA DO PRAZO';
+
+                    let transportadorClass = 'OUTROS';
+                    const ufClean = estado.toString().trim().toUpperCase();
+                    const transClean = transportadorVal ? transportadorVal.toString().toUpperCase() : '';
+
+                    if (ufClean === 'SP') transportadorClass = 'DISTRIBUIÇÃO SP';
+                    else if (ufClean === 'ES') transportadorClass = 'DISTRIBUIÇÃO ES';
+                    else if (['BA','PE','PB','AL','SE','RN','CE','MA','PI','MG'].includes(ufClean)) transportadorClass = 'HM7';
+                    else if (ufClean === 'RJ') {
+                        if (transClean.includes('REALMED') || transClean.includes('REAL MED')) transportadorClass = 'REAL MED';
+                        else transportadorClass = 'DISTRIBUIÇÃO RJ 2';
+                    }
+
+                    const getM = (d) => ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"][d.getMonth()];
+                    const mes = dEmissao ? getM(dEmissao) : 'INDEFINIDO';
+                    const ano = dEmissao ? dEmissao.getFullYear().toString() : '2026';
+
+                    return {
+                        nota_fiscal: nf,
+                        cliente: clienteNome,
+                        cidade: cidade,
+                        uf: ufClean,
+                        valor_nf: valor,
+                        volumes: volumes,
+                        transportador: transportadorClass,
+                        transportador_original: transportadorVal || '',
+                        emissao: dEmissao ? dEmissao.toISOString() : null,
+                        entrega_data: dEntrega ? dEntrega.toISOString() : null,
+                        status_de_entrega: simplifiedStatus,
+                        status_original: status,
+                        sla: slaStatus,
+                        mes: mes,
+                        ano: ano
+                    };
+                });
+
+                const total = processed.length;
+                let count = 0;
+                const batchSize = 400;
+                for (let i = 0; i < total; i += batchSize) {
+                    const batch = writeBatch(db);
+                    processed.slice(i, i + batchSize).forEach(item => batch.set(doc(collection(db, "entregas")), item));
+                    await batch.commit();
+                    count += batchSize;
+                    document.getElementById('loadingText').innerText = `Enviando ${Math.min(count, total)} de ${total}...`;
+                }
+
+                alert("Sucesso! Dados atualizados.");
+                fetchData();
+                resetAndShowDashboard();
+
+            } catch(e) { alert("Erro upload: " + e.message); }
+            finally { document.getElementById('loadingOverlay').classList.add('hidden'); }
         }
+
+        window.exportAllData = () => {
+            if(rawData.length === 0) { alert("Sem dados para exportar."); return; }
+            const exportOrder = ['nota_fiscal', 'emissao', 'cliente', 'cidade', 'uf', 'valor_nf', 'volumes', 'transportador', 'entrega_data', 'status_de_entrega', 'sla'];
+            const ws = XLSX.utils.json_to_sheet(rawData.map(d => {
+                const row = {};
+                exportOrder.forEach(key => {
+                    let val = d[key];
+                    if(key.includes('data') || key === 'emissao') {
+                        val = val ? new Date(val).toLocaleDateString('pt-BR') : '';
+                    }
+                    row[key.toUpperCase().replace('_', ' ')] = val;
+                });
+                return row;
+            }));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Base Geral");
+            XLSX.writeFile(wb, "Monitoramento_Completo.xlsx");
+        };
+
+        window.exportTableToCSV = (tid, fname) => { 
+            const t=document.getElementById(tid); let csv=[]; for(let r of t.rows){ let row=[]; for(let c of r.cells) row.push(c.innerText); csv.push(row.join(";")); } 
+            const b=new Blob([csv.join("\n")],{type:"text/csv;charset=utf-8;"}); const a=document.createElement("a"); a.download=fname; a.href=window.URL.createObjectURL(b); a.click(); 
+        };
 
         window.toggleColumnMenu = (e) => { e.stopPropagation(); document.getElementById('columnSelector').classList.toggle('hidden'); };
         window.toggleColumn = (c) => { if(visibleColumns.includes(c)) visibleColumns = visibleColumns.filter(x=>x!==c); else visibleColumns.push(c); renderDataTable(); };
-        window.syncScroll = (s) => { const a = document.getElementById('topScrollContainer'), b = document.getElementById('dataTableContainer'); if(s==='top') b.scrollLeft=a.scrollLeft; else a.scrollLeft=b.scrollLeft; };
-        
+        window.syncScroll = (s) => { /* Sync logic if needed */ };
+        window.changePage = (d) => { 
+            const max = Math.ceil(filteredData.length/rowsPerPage); const n = currentPage + d; 
+            if(n>=1 && n<=max) { currentPage = n; renderDataTable(); } 
+        };
+
         function updateColumnSelector() {
             const list = document.getElementById('extraColumnsList'); list.innerHTML = '';
             document.getElementById('mainColumnsList').innerHTML = visibleColumns.map(c => `<label class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"><input type="checkbox" checked onchange="toggleColumn('${c}')" class="mr-2 text-fb-pink rounded border-gray-300"> <span class="text-sm capitalize">${c.replace('_',' ')}</span></label>`).join('');
@@ -768,29 +1198,11 @@
 
         function renderDataTable() {
             const thead = document.getElementById('dataTableHeader'); const tbody = document.getElementById('dataTableBody');
-            thead.innerHTML = `<tr><th class="px-2 py-1 bg-gray-100 sticky left-0 z-30 border-b w-10">Ação</th>${visibleColumns.map(c=>`<th class="px-2 py-1 text-left border-b font-semibold text-gray-600 bg-gray-50">${c.replace('_',' ')}</th>`).join('')}</tr>`;
+            thead.innerHTML = `<tr><th class="px-2 py-1 bg-gray-100 sticky left-0 z-30 border-b w-10">#</th>${visibleColumns.map(c=>`<th class="px-2 py-3 text-left border-b font-bold text-gray-600 bg-gray-50 uppercase text-xs tracking-wider">${c.replace('_',' ')}</th>`).join('')}</tr>`;
             const start = (currentPage - 1) * rowsPerPage; const pageData = filteredData.slice(start, start + rowsPerPage);
-            tbody.innerHTML = pageData.map(r => `<tr class="hover:bg-blue-50"><td class="px-2 py-1 border-b sticky left-0 bg-white z-10 text-center"><button onclick="openEditModal('${r._id}')" class="text-gray-400 hover:text-fb-pink"><i class="fas fa-pen"></i></button></td>${visibleColumns.map(c => `<td class="px-2 py-1 border-b text-gray-700 whitespace-nowrap">${(c==='valor_nf' || c.includes('valor')) && r[c]?r[c].toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):r[c]||''}</td>`).join('')}</tr>`).join('');
-            document.getElementById('topScrollWidth').style.width = document.getElementById('dataTable').offsetWidth + 'px';
+            tbody.innerHTML = pageData.map(r => `<tr class="hover:bg-blue-50 transition-colors border-b last:border-0"><td class="px-2 py-1 border-b sticky left-0 bg-white z-10 text-center"><button onclick="alert('Edição rápida desativada temporariamente')" class="text-gray-300 hover:text-fb-pink"><i class="fas fa-pen"></i></button></td>${visibleColumns.map(c => `<td class="px-2 py-2 text-gray-700 whitespace-nowrap text-xs">${(c.includes('valor')) && r[c]?r[c].toLocaleString('pt-BR',{style:'currency',currency:'BRL'}): (c.includes('data') || c==='emissao' && r[c]) ? new Date(r[c]).toLocaleDateString() : r[c]||''}</td>`).join('')}</tr>`).join('');
             document.getElementById('paginationInfo').innerText = `Mostrando ${start+1}-${Math.min(start+rowsPerPage, filteredData.length)} de ${filteredData.length}`;
         }
-        window.changePage = (d) => { const max = Math.ceil(filteredData.length/rowsPerPage); const n = currentPage + d; if(n>=1 && n<=max) { currentPage = n; renderDataTable(); } };
-        
-        // Edit functions
-        window.openEditModal = (id) => {
-            const r = rawData.find(x => x._id === id); if(!r) return; editingDocId = id;
-            document.getElementById('modalFormFields').innerHTML = Object.keys(r).filter(k=>!k.startsWith('_')).sort().map(k => `<div class="flex flex-col"><label class="text-xs font-bold text-gray-500 uppercase mb-1">${k.replace('_',' ')}</label><input type="text" id="edit_${k}" value="${r[k]||''}" class="border rounded px-3 py-2 text-sm focus:ring-fb-pink"></div>`).join('');
-            document.getElementById('editModal').classList.remove('hidden');
-        };
-        window.closeEditModal = () => { document.getElementById('editModal').classList.add('hidden'); editingDocId = null; };
-        window.saveEditedRow = async () => {
-            if(!editingDocId) return;
-            const updates = {}; document.querySelectorAll('#modalFormFields input').forEach(i => updates[i.id.replace('edit_','')] = i.id.includes('valor')?parseFloat(i.value):i.value);
-            try { await updateDoc(doc(db, "entregas", editingDocId), updates); const idx = rawData.findIndex(x=>x._id===editingDocId); if(idx!==-1) rawData[idx]={...rawData[idx], ...updates}; closeEditModal(); applyFilters(); alert("Salvo!"); } catch(e){alert(e.message);}
-        };
-        window.exportTableToCSV = (tid, fname) => { /* ... export logic ... */ const t=document.getElementById(tid); let csv=[]; for(let r of t.rows){ let row=[]; for(let c of r.cells) row.push(c.innerText); csv.push(row.join(",")); } const b=new Blob([csv.join("\n")],{type:"text/csv"}); const a=document.createElement("a"); a.download=fname; a.href=window.URL.createObjectURL(b); a.click(); };
-
-        window.addEventListener('load', window.initApp);
     </script>
 </body>
 </html>
