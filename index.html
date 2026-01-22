@@ -681,6 +681,13 @@
             else if(pageId === 'data') { document.getElementById('pageTitle').innerText = "Base de Dados"; currentPage = 1; renderDataTable(); syncScroll('table'); }
         };
 
+        window.resetAndShowDashboard = () => {
+             document.getElementById('filterRegion').value = 'all';
+             document.getElementById('filterYear').value = 'all'; 
+             showPage('dashboard');
+             applyFilters();
+        };
+
         // --- DASHBOARD UI ---
         function updateDashboardUI() {
             const totalFat = filteredData.reduce((acc, curr) => acc + curr.valor_nf, 0);
@@ -790,11 +797,9 @@
                             anchor: 'end', 
                             align: 'top', 
                             formatter: (val) => {
-                                // CORREÇÃO DE FORMATAÇÃO
+                                // CORREÇÃO: Usar R$ completo em vez de k/M
                                 if (activeMetric === 'valor') {
-                                    if(val > 1000000) return (val/1000000).toFixed(1) + 'M';
-                                    if(val > 1000) return (val/1000).toFixed(1) + 'k';
-                                    return val;
+                                    return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
                                 }
                                 return val;
                             },
@@ -1150,7 +1155,7 @@
 
                 alert("Sucesso! Dados atualizados.");
                 fetchData();
-                resetAndShowDashboard();
+                window.resetAndShowDashboard(); // Call via window
 
             } catch(e) { alert("Erro upload: " + e.message); }
             finally { document.getElementById('loadingOverlay').classList.add('hidden'); }
